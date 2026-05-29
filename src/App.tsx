@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Factory, Building2, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Database, Factory, Building2, ShieldCheck, Warehouse } from 'lucide-react';
 import { seedDatabase } from './db/db';
 
 import GlobalHeader from './components/GlobalHeader';
@@ -22,12 +22,15 @@ import ProductionDashboard from './pages/Production/ProductionDashboard';
 import NewProductionBatch from './pages/Production/NewProductionBatch';
 import ProductionBatchDetail from './pages/Production/ProductionBatchDetail';
 
+import InventoryRoom from './pages/InventoryRoom';
+
 const Sidebar = () => {
   const location = useLocation();
   const routes = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Raw Material', path: '/raw-material', icon: Database },
-    { name: 'Production', path: '/production', icon: Factory }
+    { name: 'Production', path: '/production', icon: Factory },
+    { name: 'Inventory Room', path: '/inventory-room', icon: Warehouse }
   ];
 
   const isModuleActive = (routePath: string) => {
@@ -123,6 +126,8 @@ const App = () => {
               <Route path="/production" element={<ProductionDashboard />} />
               <Route path="/production/new-batch" element={<NewProductionBatch />} />
               <Route path="/production/batch/:id" element={<ProductionBatchDetail />} />
+              
+              <Route path="/inventory-room" element={<InventoryRoom />} />
             </Routes>
           </div>
         </main>
