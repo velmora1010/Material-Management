@@ -14,7 +14,7 @@ const StockManagement = () => {
   const materialMap = new Map(rawMaterials.map(m => [m.id, m]));
 
   const currentStock = rawMaterials.map(material => {
-    const matBatches = batches.filter(b => b.product_id === material.id && b.status !== 'Completed');
+    const matBatches = batches.filter(b => b.material_id === material.id && b.status !== 'Completed');
     const totalAvail = matBatches.reduce((acc, curr) => acc + curr.available_quantity, 0);
     const totalOrig = matBatches.reduce((acc, curr) => acc + curr.original_quantity, 0);
     const totalValue = matBatches.reduce((acc, curr) => acc + (curr.available_quantity * curr.price_per_kg), 0);
@@ -42,7 +42,7 @@ const StockManagement = () => {
   };
 
   const filteredBatches = batches.filter(b => {
-    const mat = materialMap.get(b.product_id);
+    const mat = materialMap.get(b.material_id);
     const searchString = `${b.batch_id} ${b.vendor_name} ${mat?.name}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
   });
@@ -150,7 +150,7 @@ const StockManagement = () => {
               </thead>
               <tbody>
                 {filteredBatches.map(b => {
-                  const material = materialMap.get(b.product_id);
+                  const material = materialMap.get(b.material_id);
                   const isDepleted = b.available_quantity === 0;
                   return (
                     <tr key={b.id} style={{ opacity: isDepleted ? 0.6 : 1, background: isDepleted ? 'var(--bg)' : 'transparent' }}>

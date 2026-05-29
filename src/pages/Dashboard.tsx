@@ -1,11 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
-import { Package, Boxes, Factory, ArrowRight, Zap, ArrowUpCircle } from 'lucide-react';
+
+import { Boxes, Factory, Zap, ArrowUpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import db from '../db/db';
 
 const Dashboard = () => {
-  const navigate = useNavigate();
+
   const [isDark, setIsDark] = useState(false);
   
   useEffect(() => {

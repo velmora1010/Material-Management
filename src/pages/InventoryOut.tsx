@@ -37,7 +37,7 @@ const InventoryOut = () => {
     const batch = await db.batches.where('batch_id').equals(bId).first();
     if (batch) {
       setBatchData(batch);
-      const material = await db.raw_materials.get(batch.product_id);
+      const material = await db.raw_materials.get(batch.material_id);
       setMaterialName(material?.name || 'Unknown Material');
     } else {
       setBatchData(null);

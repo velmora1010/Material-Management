@@ -12,7 +12,7 @@ const GenerateBarcode = () => {
   const materialMap = new Map(materials.map(m => [m.id, m]));
 
   const filteredBatches = batches.filter(b => {
-    const mat = materialMap.get(b.product_id);
+    const mat = materialMap.get(b.material_id);
     const searchString = `${b.batch_id} ${b.vendor_name} ${mat?.name}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
   }).slice(0, 12); // Limit to 12 for performance while searching
@@ -59,12 +59,12 @@ const GenerateBarcode = () => {
 
       <div className="grid grid-4">
         {filteredBatches.map((b) => {
-          const material = materialMap.get(b.product_id);
+          const material = materialMap.get(b.material_id);
           return (
             <div key={b.id} className="page-card" style={{ padding: '20px', textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
               <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
                 <div style={{ background: 'white', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <QRCodeSVG id={`qr-${b.batch_id}`} value={JSON.stringify({ batchId: b.batch_id, productId: b.product_id })} size={120} />
+                  <QRCodeSVG id={`qr-${b.batch_id}`} value={JSON.stringify({ batchId: b.batch_id, productId: b.material_id })} size={120} />
                 </div>
               </div>
               

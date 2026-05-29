@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, Filter, Eye, Boxes, X } from 'lucide-react';
+import { Search, Eye, Boxes } from 'lucide-react';
 import db from '../../db/db';
 
 const SavedStockLedger = () => {
@@ -14,7 +14,7 @@ const SavedStockLedger = () => {
   const inventoryRecords = useLiveQuery(() => db.inventory_in.orderBy('id').reverse().toArray()) || [];
   const allBatches = useLiveQuery(() => db.batches.toArray()) || [];
 
-  const rawMaterials = useLiveQuery(() => db.raw_materials.toArray()) || [];
+
 
   const filteredRecords = useMemo(() => {
     return inventoryRecords.filter(record => {

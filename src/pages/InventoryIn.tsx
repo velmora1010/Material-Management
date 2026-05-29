@@ -9,11 +9,11 @@ const InventoryIn = () => {
   const materials = useLiveQuery(() => db.raw_materials.toArray()) || [];
   
   const [formData, setFormData] = useState({
-    product_id: '', quantity_received: '', vendor_name: '', reference_no: '', price_per_kg: '', gst_percent: '18', notes: ''
+    material_id: '', quantity_received: '', vendor_name: '', reference_no: '', price_per_kg: '', gst_percent: '18', notes: ''
   });
   
   const [batches, setBatches] = useState<{ id: string; batch_no: number; quantity: number }[]>([]);
-  const [savedBatches, setSavedBatches] = useState<any[]>([]);
+
 
   useEffect(() => {
     const draft = localStorage.getItem('inventoryInDraft');
@@ -32,12 +32,12 @@ const InventoryIn = () => {
 
   const clearDraft = () => {
     localStorage.removeItem('inventoryInDraft');
-    setFormData({ product_id: '', quantity_received: '', vendor_name: '', reference_no: '', price_per_kg: '', gst_percent: '18', notes: '' });
+    setFormData({ material_id: '', quantity_received: '', vendor_name: '', reference_no: '', price_per_kg: '', gst_percent: '18', notes: '' });
     setBatches([]);
     setStep(1);
   };
 
-  const selectedMaterial = materials.find(m => m.id === Number(formData.product_id));
+  const selectedMaterial = materials.find(m => m.id === Number(formData.material_id));
   const baseAmount = (Number(formData.quantity_received) || 0) * (Number(formData.price_per_kg) || 0);
   const gstAmount = baseAmount * ((Number(formData.gst_percent) || 0) / 100);
   const totalAmount = baseAmount + gstAmount;
@@ -87,8 +87,8 @@ const InventoryIn = () => {
 
   const saveToDatabase = async () => {
     const invInId = await db.inventory_in.add({
-      product_id: Number(formData.product_id), quantity_received: targetQty,
-      vendor_name: formData.vendor_name, reference_no: formData.reference_no,
+      material_id: Number(formData.material_id), material_name: selectedMaterial?.name || '', quantity_received: targetQty,
+      vendor_name: formData.vendor_name, po_reference: formData.reference_no,
       price_per_kg: Number(formData.price_per_kg), gst_percent: Number(formData.gst_percent),
       base_amount: baseAmount, gst_amount: gstAmount, total_amount: totalAmount,
       notes: formData.notes, date_received: new Date().toISOString(), created_at: new Date().toISOString()
@@ -101,9 +101,9 @@ const InventoryIn = () => {
       const batchId = `MAT-${dateStr}-${productCode}-${String(b.batch_no).padStart(3, '0')}`;
       const batchValue = b.quantity * Number(formData.price_per_kg) * (1 + (Number(formData.gst_percent)/100));
       return {
-        batch_id: batchId, inventory_in_id: Number(invInId), product_id: Number(formData.product_id),
+        batch_id: batchId, inventory_in_id: Number(invInId), material_id: Number(formData.material_id),
         batch_no: b.batch_no, original_quantity: b.quantity, available_quantity: b.quantity,
-        vendor_name: formData.vendor_name, reference_no: formData.reference_no,
+        vendor_name: formData.vendor_name, po_reference: formData.reference_no,
         price_per_kg: Number(formData.price_per_kg), gst_percent: Number(formData.gst_percent),
         batch_value: batchValue,
         qr_data: JSON.stringify({ batchId, productId: selectedMaterial?.id }),
@@ -111,8 +111,7 @@ const InventoryIn = () => {
       };
     });
 
-    const savedIds = await db.batches.bulkAdd(finalBatches as any, { allKeys: true });
-    setSavedBatches(finalBatches.map((b, i) => ({ ...b, id: (savedIds as number[])[i] })));
+    await db.batches.bulkAdd(finalBatches as any, { allKeys: true });
     localStorage.removeItem('inventoryInDraft');
     setStep(4);
   };
@@ -151,7 +150,7 @@ const InventoryIn = () => {
               <form onSubmit={handleNextStep1} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div className="form-group">
                   <label>Select Product *</label>
-                  <select required value={formData.product_id} onChange={e => setFormData({...formData, product_id: e.target.value})}>
+                  <select required value={formData.material_id} onChange={e => setFormData({...formData, material_id: e.target.value})}>
                     <option value="">-- Choose Material --</option>
                     {materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>

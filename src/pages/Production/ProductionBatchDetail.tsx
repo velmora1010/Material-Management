@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CheckSquare, Square, QrCode, Play, AlertTriangle, Printer, Download, CheckCircle2 } from 'lucide-react';
+import { CheckSquare, Square, QrCode, Play, Printer, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import db from '../../db/db';
 
