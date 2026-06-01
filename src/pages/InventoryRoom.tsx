@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, Component } from 'react';
 import { useSupabaseQuery } from '../hooks/useSupabase';
 import { PackageCheck, Boxes, ClipboardCheck, Truck, Search, Eye, Download, Printer, Database, X } from 'lucide-react';
+
+const safeText = (value: any) => String(value ?? '').toLowerCase();
 
 const InventoryRoom = () => {
   const [activeTab, setActiveTab] = useState<'raw_material' | 'production' | 'finished_goods'>('raw_material');
@@ -32,17 +34,19 @@ const InventoryRoom = () => {
   const readyForDispatch = finishedGoodsAvailable;
 
   // Enriched Data
+  const q = safeText(searchTerm);
+
   const filteredRaw = scannedRawBatches.filter(item => 
-    item.material_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.po_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.batch_number?.toLowerCase().includes(searchTerm.toLowerCase())
+    safeText(item.material_name).includes(q) || 
+    safeText(item.vendor_name).includes(q) ||
+    safeText(item.po_reference).includes(q) ||
+    safeText(item.serial_number).includes(q) ||
+    safeText(item.batch_number).includes(q)
   );
 
   const filteredProd = productionBatches.filter(item => 
-    item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.production_batch_id?.toLowerCase().includes(searchTerm.toLowerCase())
+    safeText(item.product_name).includes(q) || 
+    safeText(item.production_batch_id).includes(q)
   ).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
    .map(pb => {
     const mbs = microBatches.filter(m => m.production_batch_id === pb.production_batch_id);
@@ -52,8 +56,8 @@ const InventoryRoom = () => {
   });
 
   const filteredFinished = finishedGoods.filter(item => 
-    item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.barcode_data?.toLowerCase().includes(searchTerm.toLowerCase())
+    safeText(item.product_name).includes(q) || 
+    safeText(item.barcode_data).includes(q)
   ).sort((a,b) => new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime());
 
   const defaultMaterials = [
@@ -86,6 +90,8 @@ const InventoryRoom = () => {
 
     return { name: mat, totalKG, availableKG, usedKG, amount, totalBatches, accentColor, accentBg, shortCode };
   });
+
+  const filteredOverviewCards = q ? overviewCards.filter(card => safeText(card.name).includes(q) || safeText(card.shortCode).includes(q)) : overviewCards;
 
   return (
     <div className="page" style={{ paddingBottom: '64px' }}>
@@ -155,8 +161,13 @@ const InventoryRoom = () => {
         </div>
         
         <div className="grid grid-4">
-          {overviewCards.map(card => (
-            <div key={card.name} className="page-card" style={{ 
+          {filteredOverviewCards.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No records found.<br/><span style={{ fontSize: '13px' }}>Try another material name, vendor, barcode, or PO number.</span>
+            </div>
+          ) : (
+            filteredOverviewCards.map(card => (
+              <div key={card.name} className="page-card" style={{ 
               padding: '16px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '14px',
               borderTop: `4px solid ${card.accentColor}`, background: 'var(--surface)'
             }}>
@@ -196,9 +207,8 @@ const InventoryRoom = () => {
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Batch</div>
                 </div>
               </div>
-
             </div>
-          ))}
+          )))}
         </div>
       </div>
 
@@ -264,7 +274,7 @@ const InventoryRoom = () => {
               </thead>
               <tbody>
                 {filteredRaw.length === 0 ? (
-                  <tr><td colSpan={11} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
+                  <tr><td colSpan={11} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.<br/><span style={{ fontSize: '13px' }}>Try another material name, vendor, barcode, or PO number.</span></td></tr>
                 ) : (
                   filteredRaw.map(row => (
                     <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -322,7 +332,7 @@ const InventoryRoom = () => {
               </thead>
               <tbody>
                 {filteredProd.length === 0 ? (
-                  <tr><td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No production records found.</td></tr>
+                  <tr><td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.<br/><span style={{ fontSize: '13px' }}>Try another material name, vendor, barcode, or PO number.</span></td></tr>
                 ) : (
                   filteredProd.map(row => (
                     <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -374,7 +384,7 @@ const InventoryRoom = () => {
               </thead>
               <tbody>
                 {filteredFinished.length === 0 ? (
-                  <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No finished goods inventory found.</td></tr>
+                  <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.<br/><span style={{ fontSize: '13px' }}>Try another material name, vendor, barcode, or PO number.</span></td></tr>
                 ) : (
                   filteredFinished.map(row => (
                     <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -502,4 +512,33 @@ const InventoryRoom = () => {
   );
 };
 
-export default InventoryRoom;
+class ErrorBoundary extends Component<any, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '48px', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Something went wrong while loading Inventory Room.</h2>
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>Clear Search</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function InventoryRoomWrapper() {
+  return (
+    <ErrorBoundary>
+      <InventoryRoom />
+    </ErrorBoundary>
+  );
+}
