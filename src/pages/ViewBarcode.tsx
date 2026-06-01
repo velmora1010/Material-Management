@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useSupabaseQuery } from '../hooks/useSupabase';
-import { Search, Printer, Download, Eye, X, Scan, CheckCircle } from 'lucide-react';
+import { Search, Printer, Download, Eye, X, Copy, Filter } from 'lucide-react';
 import Barcode from 'react-barcode';
-import { supabase } from '../lib/supabaseClient';
 
 const ViewBarcode = () => {
   const { data: batches = [], loading } = useSupabaseQuery<any>('batches', q => q.not('barcode_data', 'is', null));
@@ -11,8 +10,7 @@ const ViewBarcode = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [materialFilter, setMaterialFilter] = useState('All');
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
-  const [confirmBatch, setConfirmBatch] = useState<any>(null);
-  const [toastMessage, setToastMessage] = useState('');
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
 
   const uniqueMaterials = Array.from(new Set(batches.map(b => b.material_name)));
 
@@ -23,8 +21,13 @@ const ViewBarcode = () => {
       b.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       b.batch_id?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const bStatus = b.barcode_status || 'Barcode Saved';
-    const matchesStatus = statusFilter === 'All' || bStatus === statusFilter;
+    const isScanned = b.inventory_room_saved === true || b.barcode_status === 'Stock In';
+    const isInspected = !b.inventory_room_saved || b.barcode_status === 'Barcode Saved';
+    
+    let matchesStatus = true;
+    if (statusFilter === 'Not Scanned') matchesStatus = isInspected;
+    if (statusFilter === 'Scanned') matchesStatus = isScanned;
+
     const matchesMaterial = materialFilter === 'All' || b.material_name === materialFilter;
     
     return matchesSearch && matchesStatus && matchesMaterial;
@@ -53,52 +56,50 @@ const ViewBarcode = () => {
     img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
   };
 
-  const handleConfirmStockIn = async () => {
-    if (!confirmBatch) return;
-    try {
-      const { error } = await supabase.from('batches').update({
-        inventory_room_saved: true,
-        barcode_status: 'Stock In',
-        stock_in_at: new Date().toISOString()
-      }).eq('id', confirmBatch.id);
-
-      if (error) throw error;
-      
-      setToastMessage('Stock added to Inventory Room successfully');
-      setConfirmBatch(null);
-      setTimeout(() => setToastMessage(''), 3000);
-      
-      // Update local state temporarily to reflect change without full reload
-      const batchIdx = batches.findIndex(b => b.id === confirmBatch.id);
-      if (batchIdx >= 0) {
-        batches[batchIdx].inventory_room_saved = true;
-        batches[batchIdx].barcode_status = 'Stock In';
-      }
-    } catch (err) {
-      console.error('Error confirming stock in:', err);
-      alert('Failed to save to Inventory Room.');
-    }
-  };
-
   if (loading) return <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading saved barcodes...</div>;
 
   return (
     <>
-      {toastMessage && (
-        <div style={{
-          position: 'fixed', top: '24px', right: '24px', background: '#10b981', color: 'white',
-          padding: '12px 24px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', zIndex: 50, animation: 'slideInRight 0.3s ease-out'
-        }}>
-          <CheckCircle size={20} />
-          <span style={{ fontWeight: 500 }}>{toastMessage}</span>
-        </div>
-      )}
-
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1>View Barcode</h1>
           <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)' }}>View all saved raw material barcode labels.</p>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border)', background: 'var(--surface)' }}
+          >
+            <Filter size={18} />
+            <span style={{ fontWeight: 500 }}>Filter: {statusFilter}</span>
+          </button>
+          
+          {isFilterMenuOpen && (
+            <div style={{ 
+              position: 'absolute', top: 'calc(100% + 8px)', right: 0, 
+              background: 'var(--surface)', border: '1px solid var(--border)', 
+              borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
+              zIndex: 50, minWidth: '160px', overflow: 'hidden'
+            }}>
+              {['All', 'Not Scanned', 'Scanned'].map(opt => (
+                <div 
+                  key={opt}
+                  onClick={() => { setStatusFilter(opt); setIsFilterMenuOpen(false); }}
+                  style={{ 
+                    padding: '10px 16px', cursor: 'pointer', fontSize: '14px',
+                    background: statusFilter === opt ? 'var(--surface-soft)' : 'transparent',
+                    color: statusFilter === opt ? 'var(--primary)' : 'var(--text-primary)',
+                    fontWeight: statusFilter === opt ? 600 : 400
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-soft)'}
+                  onMouseLeave={e => e.currentTarget.style.background = statusFilter === opt ? 'var(--surface-soft)' : 'transparent'}
+                >
+                  {opt}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -124,48 +125,56 @@ const ViewBarcode = () => {
             <option key={m} value={m}>{m}</option>
           ))}
         </select>
-        
-        <select 
-          value={statusFilter} 
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }}
-        >
-          <option value="All">All Statuses</option>
-          <option value="Barcode Saved">Barcode Saved</option>
-          <option value="Stock In">Stock In</option>
-        </select>
       </div>
 
       <div className="grid grid-4 print-grid">
-        {filteredBatches.map(b => (
-          <div key={b.id} className="page-card print-label" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center', width: '100%', overflow: 'hidden' }}>
-              <div id={`view-barcode-${b.serial_number}`} style={{ background: 'white', padding: '0px', borderRadius: '8px', border: '1px solid var(--border)', display: 'inline-block', maxWidth: '100%' }}>
-                <Barcode 
-                  value={b.serial_number} 
-                  width={1.5}
-                  height={40}
-                  displayValue={false}
-                  margin={10}
-                  background="#ffffff"
-                  lineColor="#000000"
-                />
+        {filteredBatches.map(b => {
+          const isScannedBadge = b.inventory_room_saved === true || b.barcode_status === 'Stock In';
+          
+          return (
+          <div key={b.id} className="page-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div id={`view-barcode-${b.serial_number}`} style={{ display: 'flex', justifyContent: 'center', padding: '16px', background: 'white', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <Barcode 
+                value={b.serial_number} 
+                width={1.5} 
+                height={50} 
+                displayValue={false} 
+                margin={0} 
+                background="#ffffff" 
+                lineColor="#000000" 
+              />
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Material</span>
+                <strong style={{ fontSize: '14px', color: 'var(--primary)' }}>{b.material_name}</strong>
               </div>
-            </div>
-            
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 4px 0', color: 'var(--text-primary)', textAlign: 'center' }}>
-              {b.material_name}
-            </h3>
-            
-            <div style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--primary)', fontFamily: 'monospace', marginBottom: '12px', textAlign: 'center' }}>
-              {b.serial_number}
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--surface-soft)', padding: '12px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px' }}>
-              <div><span style={{ color: 'var(--text-muted)' }}>Quantity:</span> <br/><b>{b.original_quantity} KG</b></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Batch No:</span> <br/><b>{b.batch_number}</b></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Vendor:</span> <br/><b style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{b.vendor_name}</b></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Date:</span> <br/><b>{new Date(b.created_at).toISOString().slice(0,10)}</b></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Barcode No.</span>
+                <strong style={{ fontFamily: 'monospace' }}>{b.serial_number}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Quantity</span>
+                <strong>{b.original_quantity} KG</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Vendor</span>
+                <strong style={{ textAlign: 'right' }}>{b.vendor_name}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Date</span>
+                <strong>{new Date(b.created_at).toLocaleDateString()}</strong>
+              </div>
+              
+              <div style={{ 
+                marginTop: '8px', padding: '8px', borderRadius: '6px', textAlign: 'center', fontWeight: 'bold', fontSize: '14px',
+                background: isScannedBadge ? '#d1fae5' : '#fef08a',
+                color: isScannedBadge ? '#065f46' : '#854d0e',
+                border: `1px solid ${isScannedBadge ? '#34d399' : '#facc15'}`
+              }}>
+                {isScannedBadge ? 'Scanned' : 'Not Scanned'}
+              </div>
             </div>
             
             <div style={{ marginTop: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -178,21 +187,18 @@ const ViewBarcode = () => {
                 </button>
               </div>
               <button 
-                className="btn btn-primary" 
-                style={{ width: '100%', padding: '0 8px', fontSize: '12px', height: '32px', background: b.inventory_room_saved ? 'var(--surface-soft)' : '', color: b.inventory_room_saved ? 'var(--text-muted)' : '', border: b.inventory_room_saved ? '1px solid var(--border)' : '' }} 
+                className="btn btn-secondary" 
+                style={{ width: '100%', padding: '0 8px', fontSize: '12px', height: '32px', border: '1px dashed var(--border)' }} 
                 onClick={() => {
-                  if (b.inventory_room_saved) {
-                    alert('This barcode is already added to Inventory Room.');
-                  } else {
-                    setConfirmBatch(b);
-                  }
+                  navigator.clipboard.writeText(b.serial_number);
+                  alert('Barcode copied to clipboard: ' + b.serial_number);
                 }}
               >
-                <Scan size={14} /> {b.inventory_room_saved ? 'Already Added' : 'Scan to Inventory'}
+                <Copy size={14} /> Copy Barcode
               </button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       {filteredBatches.length === 0 && (
@@ -263,29 +269,22 @@ const ViewBarcode = () => {
                 <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500, color: 'var(--primary)' }}>₹{selectedBatch.batch_value.toFixed(2)}</div>
               </div>
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label>Status</label>
+                <label>Barcode Result</label>
                 <div style={{ 
                   padding: '10px', 
                   borderRadius: '6px', 
                   fontWeight: 600, 
                   textAlign: 'center',
-                  background: (selectedBatch.barcode_status || 'Barcode Saved') === 'Stock In' ? '#d1fae5' : '#dbeafe',
-                  color: (selectedBatch.barcode_status || 'Barcode Saved') === 'Stock In' ? '#065f46' : '#1e40af'
+                  background: (selectedBatch.inventory_room_saved === true || selectedBatch.barcode_status === 'Stock In') ? '#d1fae5' : '#fef08a',
+                  color: (selectedBatch.inventory_room_saved === true || selectedBatch.barcode_status === 'Stock In') ? '#065f46' : '#854d0e',
+                  border: `1px solid ${(selectedBatch.inventory_room_saved === true || selectedBatch.barcode_status === 'Stock In') ? '#34d399' : '#facc15'}`
                 }}>
-                  {selectedBatch.barcode_status || 'Barcode Saved'}
+                  {(selectedBatch.inventory_room_saved === true || selectedBatch.barcode_status === 'Stock In') ? 'Scanned' : 'Not Scanned'}
                 </div>
               </div>
             </div>
             
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-              {!selectedBatch.inventory_room_saved && (
-                <button className="btn btn-primary" onClick={() => {
-                  setConfirmBatch(selectedBatch);
-                  setSelectedBatch(null);
-                }}>
-                  <Scan size={16} /> Scan to Inventory
-                </button>
-              )}
               <button className="btn btn-secondary" onClick={() => downloadQR(selectedBatch.serial_number)}>
                 <Download size={16} /> Download Label
               </button>
@@ -303,37 +302,6 @@ const ViewBarcode = () => {
               }}>
                 <Printer size={16} /> Print Barcode
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {confirmBatch && (
-        <div className="modal-overlay" onClick={() => setConfirmBatch(null)}>
-          <div className="modal-content" style={{ width: '450px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Confirm Stock In</h2>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setConfirmBatch(null)}>
-                <X size={24} />
-              </button>
-            </div>
-            
-            <p style={{ marginBottom: '20px', color: 'var(--text-primary)' }}>
-              Do you want to add this barcode stock into Inventory Room?
-            </p>
-            
-            <div style={{ background: 'var(--surface-soft)', padding: '16px', borderRadius: '8px', marginBottom: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '14px' }}>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>Material Name</span><strong>{confirmBatch.material_name}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>Barcode Number</span><strong>{confirmBatch.serial_number}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>Quantity KG</span><strong>{confirmBatch.original_quantity} KG</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>Vendor</span><strong>{confirmBatch.vendor_name}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>Batch No</span><strong>{confirmBatch.batch_number}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>Date</span><strong>{new Date(confirmBatch.created_at).toISOString().slice(0,10)}</strong></div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setConfirmBatch(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleConfirmStockIn}>OK, Add to Inventory Room</button>
             </div>
           </div>
         </div>
