@@ -69,6 +69,7 @@ const InventoryRoom = () => {
     const totalKG = batches.reduce((sum, b) => sum + (b.original_quantity || 0), 0);
     const availableKG = batches.reduce((sum, b) => sum + (b.available_quantity ?? b.original_quantity ?? 0), 0);
     const usedKG = totalKG - availableKG;
+    const amount = batches.reduce((sum, b) => sum + (b.batch_value || ((b.original_quantity || 0) * (b.price_per_kg || 0))), 0);
     
     let accentColor = 'var(--primary)';
     let accentBg = 'var(--surface-soft)';
@@ -83,15 +84,15 @@ const InventoryRoom = () => {
     if (mat.includes('Saffron')) { accentColor = '#10b981'; accentBg = 'rgba(16, 185, 129, 0.1)'; shortCode = 'FM'; }
     if (mat.includes('Comfort')) { accentColor = '#f97316'; accentBg = 'rgba(249, 115, 22, 0.1)'; shortCode = 'CB'; }
 
-    return { name: mat, totalKG, availableKG, usedKG, totalBatches, accentColor, accentBg, shortCode };
+    return { name: mat, totalKG, availableKG, usedKG, amount, totalBatches, accentColor, accentBg, shortCode };
   });
 
   return (
     <div className="page" style={{ paddingBottom: '64px' }}>
       <div className="page-header" style={{ marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', margin: '0 0 8px 0' }}>Inventory Room</h1>
-          <p style={{ color: 'var(--text-muted)', margin: 0 }}>Central ledger for all saved stock and production records.</p>
+          <h1 style={{ fontSize: '28px', margin: '0 0 8px 0' }}>Inventory Overview</h1>
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>Central overview of raw material stock, production stock, finished goods, and inventory records.</p>
         </div>
       </div>
 
@@ -146,11 +147,11 @@ const InventoryRoom = () => {
         </div>
       </div>
 
-      {/* INVENTORY OVERVIEW SECTION */}
+      {/* RAW MATERIAL OVERVIEW SECTION */}
       <div style={{ marginBottom: '40px' }}>
         <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ fontSize: '20px', margin: '0 0 4px 0' }}>Inventory Overview</h2>
-          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '14px' }}>Product-wise raw material stock, available quantity, used quantity, and batch count.</p>
+          <h2 style={{ fontSize: '20px', margin: '0 0 4px 0' }}>Raw Material Overview</h2>
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '14px' }}>Product-wise raw material stock, available quantity, used quantity, amount, and batch count.</p>
         </div>
         
         <div className="grid grid-4">
@@ -177,14 +178,22 @@ const InventoryRoom = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                <div style={{ flex: 1, padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: 'auto' }}>
+                <div style={{ padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#10b981' }}>{card.availableKG.toFixed(1)}kg</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Available</div>
                 </div>
-                <div style={{ flex: 1, padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ef4444' }}>{card.usedKG.toFixed(1)}kg</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Used</div>
+                </div>
+                <div style={{ padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#3b82f6' }}>₹{card.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Amount</div>
+                </div>
+                <div style={{ padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#8b5cf6' }}>{card.totalBatches}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Batch</div>
                 </div>
               </div>
 
