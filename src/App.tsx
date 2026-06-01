@@ -38,6 +38,24 @@ const Sidebar = () => {
     return location.pathname.startsWith(routePath);
   };
 
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(document.body.classList.contains('dark'));
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newDark = !isDark;
+    setIsDark(newDark);
+    if (newDark) {
+      document.body.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.body.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
   return (
     <aside className="sidebar">
       
@@ -68,6 +86,16 @@ const Sidebar = () => {
       
       {/* Bottom System Card */}
       <div style={{ marginTop: 'auto', paddingTop: '24px' }}>
+        <div style={{ padding: '0 12px 24px 12px' }}>
+          <label className="dark-mode-toggle" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', cursor: 'pointer' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Dark Mode</span>
+            <div className="switch" style={{ margin: 0 }}>
+              <input type="checkbox" checked={isDark} onChange={toggleDarkMode} />
+              <span className="slider"></span>
+            </div>
+          </label>
+        </div>
+
         <div style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: '14px', padding: '20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <ShieldCheck size={24} style={{ marginBottom: '8px', color: 'var(--primary)' }} />
           <span style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: 'var(--text-primary)' }}>ERP System v3.0</span>

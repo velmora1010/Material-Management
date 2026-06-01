@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, ArrowLeft, Bell, MapPin, UserCircle2 } from 'lucide-react';
+import GlobalScanner from './GlobalScanner';
 
 const GlobalHeader = () => {
   const location = useLocation();
@@ -48,6 +49,8 @@ const GlobalHeader = () => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+        <GlobalScanner />
+        
         <button style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
           <Bell size={20} />
           <span style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', background: 'var(--danger)', borderRadius: '50%', border: '2px solid var(--surface)' }}></span>

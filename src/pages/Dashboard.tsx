@@ -1,28 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import { Boxes, Factory, Zap, ArrowUpCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+
 import db from '../db/db';
 
 const Dashboard = () => {
 
-  const [isDark, setIsDark] = useState(false);
-  
-  useEffect(() => {
-    setIsDark(document.body.classList.contains('dark'));
-  }, []);
-
-  const toggleDarkMode = () => {
-    const newDark = !isDark;
-    setIsDark(newDark);
-    if (newDark) {
-      document.body.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.body.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  };
+  // Dark mode logic removed from Dashboard as it's now in Sidebar
 
   // Raw Material Data
   const rawMaterials = useLiveQuery(() => db.raw_materials.toArray()) || [];
@@ -42,7 +26,7 @@ const Dashboard = () => {
   // --- PRODUCTION CALCULATIONS ---
   const totalProdBatches = productionBatches.length;
   const inProgressProdBatches = productionBatches.filter(b => b.status === 'In Progress').length;
-  const completedProdBatches = productionBatches.filter(b => b.status === 'Complete').length;
+  const completedProdBatches = productionBatches.filter(b => b.status === 'Complete' || b.status === 'Saved').length;
   const finishedGoodsUnits = finishedGoods.reduce((acc, item) => acc + item.units, 0);
   const totalProducedUnits = productionBatches.reduce((acc, item) => acc + item.produced_units, 0);
   
@@ -55,14 +39,6 @@ const Dashboard = () => {
           <h1 style={{ fontSize: '28px', margin: '0 0 8px 0' }}>Dashboard Overview</h1>
           <p style={{ color: 'var(--text-muted)', margin: 0 }}>System Performance & Analytics</p>
         </div>
-        
-        <label className="dark-mode-toggle">
-          <span>Dark Mode</span>
-          <div className="switch">
-            <input type="checkbox" checked={isDark} onChange={toggleDarkMode} />
-            <span className="slider"></span>
-          </div>
-        </label>
       </div>
 
       {/* SECTION 1: RAW MATERIAL SUMMARY */}
@@ -184,10 +160,10 @@ const Dashboard = () => {
                     <td style={{ padding: '12px' }}>
                       <span style={{ 
                         fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase',
-                        background: item.status === 'Complete' ? 'var(--success-bg)' : item.status === 'Prep' ? '#fef3c7' : '#eff6ff',
-                        color: item.status === 'Complete' ? 'var(--success-text)' : item.status === 'Prep' ? '#d97706' : '#3b82f6'
+                        background: item.status === 'Complete' || item.status === 'Saved' ? 'var(--success-bg)' : item.status === 'Prep' ? '#fef3c7' : '#eff6ff',
+                        color: item.status === 'Complete' || item.status === 'Saved' ? 'var(--success-text)' : item.status === 'Prep' ? '#d97706' : '#3b82f6'
                       }}>
-                        {item.status}
+                        {item.status === 'Saved' ? 'Saved' : item.status}
                       </span>
                     </td>
                   </tr>

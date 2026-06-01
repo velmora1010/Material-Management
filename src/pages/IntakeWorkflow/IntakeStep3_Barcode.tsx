@@ -1,6 +1,6 @@
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useIntakeContext } from './IntakeContext';
-import { QRCodeSVG } from 'qrcode.react';
+import Barcode from 'react-barcode';
 import { Printer, Download, Save } from 'lucide-react';
 import db from '../../db/db';
 
@@ -50,11 +50,8 @@ const IntakeStep3_Barcode = () => {
       const batchId = `MAT-${dateStr}-${productCode}-${String(b.batch_no).padStart(3, '0')}`;
       const batchValue = b.quantity * Number(formData.price_per_kg) * (1 + (Number(formData.gst_percent)/100));
       
-      const qrDataPayload = JSON.stringify({ 
-        serialNumber: b.serialNumber, 
-        batchId: batchId, 
-        materialId: selectedMaterial.id 
-      });
+      // Remove QR JSON logic. The barcode only needs to store the serial number (batch_id).
+      const qrDataPayload = b.serialNumber;
 
       return {
         batch_id: batchId, 
@@ -82,7 +79,9 @@ const IntakeStep3_Barcode = () => {
   };
 
   const downloadQR = (serial: string) => {
-    const svg = document.getElementById(`qr-${serial}`);
+    // Select the svg inside the wrapper
+    const wrapper = document.getElementById(`barcode-${serial}`);
+    const svg = wrapper?.querySelector('svg');
     if (!svg) return;
     const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement('canvas');
@@ -96,7 +95,7 @@ const IntakeStep3_Barcode = () => {
         ctx.drawImage(img, 0, 0);
       }
       const downloadLink = document.createElement('a');
-      downloadLink.download = `${serial}.png`;
+      downloadLink.download = `Barcode-${serial}.png`;
       downloadLink.href = canvas.toDataURL('image/png');
       downloadLink.click();
     };
@@ -112,7 +111,7 @@ const IntakeStep3_Barcode = () => {
   return (
     <>
       <div className="page-header">
-        <h1>Step 3: Generate Barcode / QR Labels</h1>
+        <h1>Step 3: Generate Barcode Labels</h1>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-secondary" onClick={() => window.print()}>
             <Printer size={16} /> Print All
@@ -126,41 +125,51 @@ const IntakeStep3_Barcode = () => {
         </div>
       </div>
 
-      <div className="grid grid-3" style={{ marginBottom: '24px' }}>
-        {previewBatches.map((b) => (
-          <div key={b.id} className="page-card" style={{ padding: '24px', textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
-              <div style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                <QRCodeSVG 
-                  id={`qr-${b.serialNumber}`} 
-                  value={JSON.stringify({ serialNumber: b.serialNumber, materialName: selectedMaterial.name })} 
-                  size={140} 
-                />
+      <div className="grid grid-3 print-grid" style={{ marginBottom: '24px' }}>
+        {previewBatches.map((b) => {
+
+
+          return (
+            <div key={b.id} className="page-card print-label" style={{ padding: '24px', textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
+              <div className="label-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center', width: '100%', overflow: 'hidden' }}>
+                  <div id={`barcode-${b.serialNumber}`} className="qr-wrapper" style={{ background: 'white', padding: '0px', borderRadius: '8px', border: '1px solid var(--border)', display: 'inline-block', maxWidth: '100%' }}>
+                    <Barcode 
+                      value={b.serialNumber} 
+                      width={1.5}
+                      height={40}
+                      displayValue={false}
+                      margin={10}
+                      background="#ffffff"
+                      lineColor="#000000"
+                    />
+                  </div>
+                </div>
+                
+                <h3 className="label-title" style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
+                  {selectedMaterial.name}
+                </h3>
+                
+                <div className="label-serial" style={{ fontWeight: 'bold', fontSize: '16px', color: 'var(--primary)', fontFamily: 'monospace', marginBottom: '12px' }}>
+                  {b.serialNumber}
+                </div>
+                
+                <div className="label-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left', background: 'var(--surface-soft)', padding: '12px', borderRadius: '8px', fontSize: '12px', marginBottom: '20px' }}>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Quantity:</span> <br/><b>{b.quantity} KG</b></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Batch No:</span> <br/><b>{b.batch_no}</b></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Vendor:</span> <br/><b style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{formData.vendor_name}</b></div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>Date:</span> <br/><b>{formData.date_received || new Date().toISOString().slice(0,10)}</b></div>
+                </div>
+              </div>
+              
+              <div className="no-print" style={{ marginTop: 'auto', display: 'flex', gap: '12px' }}>
+                <button className="btn btn-secondary" style={{ flex: 1, padding: '0 8px' }} onClick={() => downloadQR(b.serialNumber)}>
+                  <Download size={16} /> Download
+                </button>
               </div>
             </div>
-            
-            <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
-              {selectedMaterial.name}
-            </h3>
-            
-            <div style={{ fontWeight: 'bold', fontSize: '18px', color: 'var(--primary)', fontFamily: 'monospace', marginBottom: '16px' }}>
-              {b.serialNumber}
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left', background: 'var(--surface-soft)', padding: '12px', borderRadius: '8px', fontSize: '12px', marginBottom: '20px' }}>
-              <div><span style={{ color: 'var(--text-muted)' }}>Quantity:</span> <br/><b>{b.quantity} KG</b></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Batch No:</span> <br/><b>{b.batch_no}</b></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Vendor:</span> <br/><b>{formData.vendor_name}</b></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Date:</span> <br/><b>{formData.date_received}</b></div>
-            </div>
-            
-            <div style={{ marginTop: 'auto', display: 'flex', gap: '12px' }}>
-              <button className="btn btn-secondary" style={{ flex: 1, padding: '0 8px' }} onClick={() => downloadQR(b.serialNumber)}>
-                <Download size={16} /> Download
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>

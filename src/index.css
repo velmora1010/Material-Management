@@ -533,3 +533,99 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(16px);
 }
+
+/* Print Styles */
+@media print {
+  /* Force everything to white/black for printing */
+  body.dark,
+  body.dark .app-shell,
+  body.dark .page-content,
+  body.dark .main-content,
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide sidebar and header */
+  .sidebar, .header, .no-print, .page-header {
+    display: none !important;
+  }
+
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .page-content {
+    padding: 0 !important;
+  }
+
+  .print-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10mm !important;
+    margin: 0 !important;
+  }
+
+  /* Target specific label card */
+  .print-label {
+    width: 70mm !important;
+    height: 50mm !important;
+    background: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 4mm !important;
+    margin: 0 !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .label-content {
+    height: 100% !important;
+  }
+
+  .qr-wrapper {
+    background: white !important;
+    padding: 2mm !important;
+    border: none !important;
+    margin-bottom: 2mm !important;
+  }
+
+  .label-title {
+    font-size: 14px !important;
+    margin-bottom: 2mm !important;
+    color: black !important;
+  }
+
+  .label-serial {
+    font-size: 12px !important;
+    margin-bottom: 2mm !important;
+    color: black !important;
+  }
+
+  .label-details {
+    background: transparent !important;
+    padding: 0 !important;
+    font-size: 10px !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1mm !important;
+  }
+  
+  .label-details span {
+    color: black !important;
+    font-weight: normal !important;
+  }
+  
+  .label-details b {
+    color: black !important;
+  }
+
+  body.dark .print-label * {
+    color: black !important;
+    background: transparent !important;
+  }
+}

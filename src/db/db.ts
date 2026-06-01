@@ -73,7 +73,7 @@ export interface ProductionBatch {
   batch_type: string; // Full Set, Micro Batch, Custom
   produced_by: string;
   notes: string;
-  status: 'Prep' | 'In Progress' | 'Complete';
+  status: 'Prep' | 'In Progress' | 'Complete' | 'Saved';
   total_micro_batches: number;
   completed_micro_batches: number;
   produced_units: number;

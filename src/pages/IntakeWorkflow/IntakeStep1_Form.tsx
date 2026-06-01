@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useIntakeContext } from './IntakeContext';
 import { Package } from 'lucide-react';
 import db from '../../db/db';
-import SavedStockLedger from './SavedStockLedger';
+
 
 const IntakeStep1_Form = () => {
   const navigate = useNavigate();
@@ -147,7 +147,7 @@ const IntakeStep1_Form = () => {
         </div>
       )}
 
-      <SavedStockLedger />
+
     </>
   );
 };

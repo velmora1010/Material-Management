@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CheckSquare, Square, QrCode, Play, Printer, CheckCircle2 } from 'lucide-react';
+import { CheckSquare, Square, QrCode, Play, Printer, CheckCircle2, Home, PackagePlus, Boxes } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import db from '../../db/db';
 
@@ -18,9 +18,6 @@ const ProductionBatchDetail = () => {
   const [failReason, setFailReason] = useState('Quality issue');
 
   const [barcodeModalOpen, setBarcodeModalOpen] = useState<any>(null);
-
-  const [inventoryScanMode, setInventoryScanMode] = useState(false);
-  const [inventoryScanInput, setInventoryScanInput] = useState('');
 
   const productionBatch = useLiveQuery(() => db.production_batches.get(Number(id)), [id]);
   const ingredients = useLiveQuery(() => db.production_ingredients.where('production_batch_id').equals(productionBatch?.production_batch_id || '').toArray(), [productionBatch?.production_batch_id]) || [];
@@ -129,49 +126,32 @@ const ProductionBatchDetail = () => {
     setFailingMicroBatch(null);
   };
 
-  const handleScanInventorySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateQR = async (mb: any) => {
+    setBarcodeModalOpen(mb);
+    
+    // Auto-save to finished_goods_inventory if not already saved
+    const exists = await db.finished_goods_inventory.where('micro_batch_id').equals(mb.id!).first();
+    if (!exists && productionBatch) {
+      await db.finished_goods_inventory.add({
+        production_batch_id: productionBatch.production_batch_id,
+        micro_batch_id: mb.id!,
+        product_name: productionBatch.product_name,
+        units: mb.units,
+        barcode_data: mb.barcode_data!,
+        scanned_at: new Date().toISOString(),
+        status: 'In Stock'
+      });
+      
+      const newInventoryCount = productionBatch.inventory_units + mb.units;
+      await db.production_batches.update(productionBatch.id!, {
+        inventory_units: newInventoryCount
+      });
+    }
+  };
+
+  const handleFinishProduction = async () => {
     if (!productionBatch) return;
-
-    const mb = microBatches.find(m => m.barcode_data === inventoryScanInput && m.status === 'Passed');
-    
-    if (!mb) {
-      alert('Error: Invalid barcode or micro batch not passed.');
-      return;
-    }
-
-    if (mb.scanned_into_inventory_at) {
-      alert('Error: This batch is already in inventory.');
-      return;
-    }
-
-    await db.production_micro_batches.update(mb.id!, {
-      scanned_into_inventory_at: new Date().toISOString()
-    });
-
-    await db.finished_goods_inventory.add({
-      production_batch_id: productionBatch.production_batch_id,
-      micro_batch_id: mb.id!,
-      product_name: productionBatch.product_name,
-      units: mb.units,
-      barcode_data: mb.barcode_data!,
-      scanned_at: new Date().toISOString(),
-      status: 'In Stock'
-    });
-
-    const newInventoryCount = productionBatch.inventory_units + mb.units;
-    
-    const totalPassed = microBatches.filter(m => m.status === 'Passed').length;
-    const totalScanned = microBatches.filter(m => m.scanned_into_inventory_at).length + 1;
-    const isFullyComplete = productionBatch.completed_micro_batches === productionBatch.total_micro_batches && totalPassed === totalScanned;
-
-    await db.production_batches.update(productionBatch.id!, {
-      inventory_units: newInventoryCount,
-      status: isFullyComplete ? 'Complete' : productionBatch.status
-    });
-
-    setInventoryScanInput('');
-    alert(`Success: MB${mb.micro_batch_no} added to Finished Goods Inventory!`);
+    await db.production_batches.update(productionBatch.id!, { status: 'Saved' } as any);
   };
 
   if (!productionBatch) return <div style={{ padding: '48px', textAlign: 'center' }}>Loading...</div>;
@@ -267,7 +247,7 @@ const ProductionBatchDetail = () => {
                     <button 
                       className="btn btn-primary" 
                       style={{ background: '#f97316', borderColor: '#f97316', padding: '10px 20px' }}
-                      onClick={() => setBarcodeModalOpen(mb)}
+                      onClick={() => handleGenerateQR(mb)}
                     >
                       <Printer size={16} style={{ marginRight: '8px' }} /> Generate QR Labels
                     </button>
@@ -276,11 +256,40 @@ const ProductionBatchDetail = () => {
               ))}
             </div>
           </div>
+          
+          <div style={{ textAlign: 'center', marginTop: '32px' }}>
+            <button className="btn btn-primary" style={{ padding: '12px 32px', fontSize: '16px' }} onClick={handleFinishProduction}>
+              Save Finished Goods & Complete
+            </button>
+          </div>
         </>
       )}
 
+      {/* FINAL SAVED SUCCESS UI */}
+      {productionBatch.status === 'Saved' && (
+        <div className="page-card" style={{ textAlign: 'center', padding: '64px 20px', marginTop: '24px' }}>
+          <CheckCircle2 size={64} style={{ color: 'var(--success-text)', margin: '0 auto 16px auto' }} />
+          <h2 style={{ fontSize: '28px', margin: '0 0 12px 0', color: 'var(--text-primary)' }}>Production Saved Successfully!</h2>
+          <p style={{ color: 'var(--primary)', marginBottom: '40px', fontSize: '18px', fontWeight: 500 }}>
+            Production saved successfully. Go to Inventory Room to view production stock.
+          </p>
+          
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={() => navigate('/inventory-room')} style={{ padding: '0 24px', height: '48px' }}>
+              <Boxes size={18} /> Go to Inventory Room
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/production/new-batch')} style={{ padding: '0 24px', height: '48px' }}>
+              <PackagePlus size={18} /> Create Another Batch
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ padding: '0 24px', height: '48px' }}>
+              <Home size={18} /> Home
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* STAGE 1: PREPARATION */}
-      {!isFullyComplete && (
+      {!isFullyComplete && productionBatch.status !== 'Saved' && (
         <div className="page-card" style={{ marginBottom: '24px', border: showMicroBatches ? '1px solid var(--border)' : '2px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -336,8 +345,8 @@ const ProductionBatchDetail = () => {
       )}
 
       {/* STAGE 2: MICRO BATCHES */}
-      {!isFullyComplete && showMicroBatches && (
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px' }}>
+      {!isFullyComplete && productionBatch.status !== 'Saved' && showMicroBatches && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
           
           <div className="page-card">
             <h2 style={{ fontSize: '18px', margin: '0 0 16px 0' }}>Stage 2: Micro Batches Execution</h2>
@@ -393,36 +402,6 @@ const ProductionBatchDetail = () => {
                   })}
                 </tbody>
               </table>
-            </div>
-          </div>
-
-          <div>
-            <div className="page-card" style={{ background: inventoryScanMode ? '#eff6ff' : 'var(--surface)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '16px', margin: 0, color: 'var(--text-primary)' }}>Inventory Scanner</h3>
-                <button className="btn btn-secondary" style={{ padding: '4px 8px', height: 'auto', fontSize: '12px', color: '#3b82f6', borderColor: '#3b82f6' }} onClick={() => setInventoryScanMode(!inventoryScanMode)}>
-                  <QrCode size={14} style={{ marginRight: '4px' }} /> {inventoryScanMode ? 'Close' : 'Scan'}
-                </button>
-              </div>
-
-              {inventoryScanMode ? (
-                <form onSubmit={handleScanInventorySubmit}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-muted)' }}>Scan Passed MB Barcode</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. PROD-LA-20260529-MB001" 
-                    value={inventoryScanInput} 
-                    onChange={e => setInventoryScanInput(e.target.value)} 
-                    autoFocus
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '2px solid #3b82f6', marginBottom: '12px' }} 
-                  />
-                  <button type="submit" className="btn btn-primary" style={{ width: '100%', background: '#3b82f6', borderColor: '#3b82f6' }}>Scan Into Inventory</button>
-                </form>
-              ) : (
-                <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Activate scanner to move passed micro batches into Finished Goods inventory.
-                </div>
-              )}
             </div>
           </div>
 
