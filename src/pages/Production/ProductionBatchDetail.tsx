@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { CheckSquare, Square, QrCode, Play, Printer, CheckCircle2, Home, PackagePlus, Boxes } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import db from '../../db/db';
+import { useSupabaseQuery } from '../../hooks/useSupabase';
+import { supabase } from '../../lib/supabaseClient';
 
 const ProductionBatchDetail = () => {
   const { id } = useParams();
@@ -19,20 +19,26 @@ const ProductionBatchDetail = () => {
 
   const [barcodeModalOpen, setBarcodeModalOpen] = useState<any>(null);
 
-  const productionBatch = useLiveQuery(() => db.production_batches.get(Number(id)), [id]);
-  const ingredients = useLiveQuery(() => db.production_ingredients.where('production_batch_id').equals(productionBatch?.production_batch_id || '').toArray(), [productionBatch?.production_batch_id]) || [];
-  const microBatches = useLiveQuery(() => db.production_micro_batches.where('production_batch_id').equals(productionBatch?.production_batch_id || '').toArray(), [productionBatch?.production_batch_id]) || [];
+  const { data: productionBatches = [], refetch: refetchBatch } = useSupabaseQuery<any>('production_batches', q => q.eq('id', id));
+  const productionBatch = productionBatches[0];
+
+  const prodBatchId = productionBatch?.production_batch_id || '';
+  
+  const { data: ingredients = [], refetch: refetchIng } = useSupabaseQuery<any>('production_ingredients', q => q.eq('production_batch_id', prodBatchId));
+  const { data: microBatches = [], refetch: refetchMb } = useSupabaseQuery<any>('production_micro_batches', q => q.eq('production_batch_id', prodBatchId));
 
   const handleToggleIngredient = async (ing: any) => {
     const newStatus = ing.status === 'Ready' ? 'Pending' : 'Ready';
-    await db.production_ingredients.update(ing.id!, { status: newStatus });
+    await supabase.from('production_ingredients').update({ status: newStatus }).eq('id', ing.id);
+    refetchIng();
   };
 
   const handleScanRawMaterialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scanningIngredient || !productionBatch) return;
 
-    const rawBatch = await db.batches.where('serial_number').equals(scanSerialInput).first();
+    const { data: rawBatches } = await supabase.from('batches').select('*').eq('serial_number', scanSerialInput);
+    const rawBatch = rawBatches?.[0];
     
     if (!rawBatch) {
       alert('Error: Batch not found for this serial number.');
@@ -54,25 +60,25 @@ const ProductionBatchDetail = () => {
     const deductQty = Math.min(requiredLeft, rawBatch.available_quantity);
     const newAvailable = rawBatch.available_quantity - deductQty;
 
-    await db.batches.update(rawBatch.id!, {
+    await supabase.from('batches').update({
       available_quantity: newAvailable,
       status: newAvailable <= 0 ? 'Depleted' : newAvailable < (rawBatch.original_quantity * 0.2) ? 'Low Stock' : 'Active'
-    });
+    }).eq('id', rawBatch.id);
 
-    await db.raw_material_issues.add({
+    await supabase.from('raw_material_issues').insert({
       production_batch_id: productionBatch.production_batch_id,
       raw_material_batch_id: rawBatch.serial_number,
       material_name: rawBatch.material_name,
-      quantity_issued: deductQty,
-      issued_at: new Date().toISOString()
+      quantity_issued: deductQty
     });
 
     const newScanned = scanningIngredient.scanned_quantity + deductQty;
-    await db.production_ingredients.update(scanningIngredient.id!, {
+    await supabase.from('production_ingredients').update({
       scanned_quantity: newScanned,
       status: newScanned >= scanningIngredient.required_quantity ? 'Ready' : 'Pending'
-    });
+    }).eq('id', scanningIngredient.id);
 
+    refetchIng();
     setScanSerialInput('');
     if (newScanned >= scanningIngredient.required_quantity) {
       setScanModalOpen(false);
@@ -84,44 +90,50 @@ const ProductionBatchDetail = () => {
 
   const handleStartMicroBatches = async () => {
     if (!productionBatch) return;
-    await db.production_batches.update(productionBatch.id!, { status: 'In Progress' });
+    await supabase.from('production_batches').update({ status: 'In Progress' }).eq('id', productionBatch.id);
+    refetchBatch();
   };
 
   const handlePassMicroBatch = async (mb: any) => {
     if (!productionBatch) return;
     const barcode = `${productionBatch.production_batch_id}-MB${String(mb.micro_batch_no).padStart(3, '0')}`;
     
-    await db.production_micro_batches.update(mb.id!, {
+    await supabase.from('production_micro_batches').update({
       status: 'Passed',
       barcode_data: barcode,
       completed_at: new Date().toISOString()
-    });
+    }).eq('id', mb.id);
 
     const completedCount = productionBatch.completed_micro_batches + 1;
     const isNowComplete = completedCount === productionBatch.total_micro_batches;
     
-    await db.production_batches.update(productionBatch.id!, {
+    await supabase.from('production_batches').update({
       completed_micro_batches: completedCount,
       produced_units: productionBatch.produced_units + mb.units,
       status: isNowComplete ? 'Complete' : productionBatch.status
-    });
+    }).eq('id', productionBatch.id);
+    
+    refetchBatch();
+    refetchMb();
   };
 
   const handleFailMicroBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!failingMicroBatch || !productionBatch) return;
 
-    await db.production_micro_batches.update(failingMicroBatch.id!, {
+    await supabase.from('production_micro_batches').update({
       status: 'Failed',
       failure_reason: failReason,
       completed_at: new Date().toISOString()
-    });
+    }).eq('id', failingMicroBatch.id);
 
     const completedCount = productionBatch.completed_micro_batches + 1;
-    await db.production_batches.update(productionBatch.id!, {
+    await supabase.from('production_batches').update({
       completed_micro_batches: completedCount
-    });
+    }).eq('id', productionBatch.id);
 
+    refetchBatch();
+    refetchMb();
     setFailModalOpen(false);
     setFailingMicroBatch(null);
   };
@@ -130,28 +142,31 @@ const ProductionBatchDetail = () => {
     setBarcodeModalOpen(mb);
     
     // Auto-save to finished_goods_inventory if not already saved
-    const exists = await db.finished_goods_inventory.where('micro_batch_id').equals(mb.id!).first();
-    if (!exists && productionBatch) {
-      await db.finished_goods_inventory.add({
+    const { data: existing } = await supabase.from('finished_goods_inventory').select('id').eq('micro_batch_id', mb.id);
+    
+    if (existing?.length === 0 && productionBatch) {
+      await supabase.from('finished_goods_inventory').insert({
         production_batch_id: productionBatch.production_batch_id,
-        micro_batch_id: mb.id!,
+        micro_batch_id: mb.id,
         product_name: productionBatch.product_name,
         units: mb.units,
-        barcode_data: mb.barcode_data!,
-        scanned_at: new Date().toISOString(),
+        barcode_data: mb.barcode_data,
         status: 'In Stock'
       });
       
       const newInventoryCount = productionBatch.inventory_units + mb.units;
-      await db.production_batches.update(productionBatch.id!, {
+      await supabase.from('production_batches').update({
         inventory_units: newInventoryCount
-      });
+      }).eq('id', productionBatch.id);
+      
+      refetchBatch();
     }
   };
 
   const handleFinishProduction = async () => {
     if (!productionBatch) return;
-    await db.production_batches.update(productionBatch.id!, { status: 'Saved' } as any);
+    await supabase.from('production_batches').update({ status: 'Saved' }).eq('id', productionBatch.id);
+    refetchBatch();
   };
 
   if (!productionBatch) return <div style={{ padding: '48px', textAlign: 'center' }}>Loading...</div>;

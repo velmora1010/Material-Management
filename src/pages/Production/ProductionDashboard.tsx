@@ -1,21 +1,22 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useSupabaseQuery } from '../../hooks/useSupabase';
 import { Plus, QrCode, ClipboardList, Factory, Archive, ArrowRight } from 'lucide-react';
-import db from '../../db/db';
 
 const ProductionDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'All' | 'In Progress' | 'Complete'>('All');
 
-  const productionBatches = useLiveQuery(() => db.production_batches.orderBy('id').reverse().toArray()) || [];
+  const { data: productionBatches = [], loading } = useSupabaseQuery<any>('production_batches', q => q.order('created_at', { ascending: false }));
   
-  const inProgressCount = productionBatches.filter(b => b.status === 'Prep' || b.status === 'In Progress').length;
-  const completedCount = productionBatches.filter(b => b.status === 'Complete').length;
-  const totalProduced = productionBatches.reduce((sum, b) => sum + (b.produced_units || 0), 0);
-  const inInventory = productionBatches.reduce((sum, b) => sum + (b.inventory_units || 0), 0);
+  if (loading) return <div>Loading...</div>;
 
-  const filteredBatches = productionBatches.filter(b => {
+  const inProgressCount = productionBatches.filter((b: any) => b.status === 'Prep' || b.status === 'In Progress').length;
+  const completedCount = productionBatches.filter((b: any) => b.status === 'Complete').length;
+  const totalProduced = productionBatches.reduce((sum: number, b: any) => sum + (b.produced_units || 0), 0);
+  const inInventory = productionBatches.reduce((sum: number, b: any) => sum + (b.inventory_units || 0), 0);
+
+  const filteredBatches = productionBatches.filter((b: any) => {
     if (activeTab === 'All') return true;
     if (activeTab === 'Complete') return b.status === 'Complete';
     return b.status === 'Prep' || b.status === 'In Progress';
@@ -105,7 +106,7 @@ const ProductionDashboard = () => {
             No batches found in this state.
           </div>
         ) : (
-          filteredBatches.map(batch => {
+          filteredBatches.map((batch: any) => {
             const progress = batch.total_micro_batches > 0 ? Math.round((batch.completed_micro_batches / batch.total_micro_batches) * 100) : 0;
             const statusColor = batch.status === 'Complete' ? 'var(--success-text)' : batch.status === 'Prep' ? '#f59e0b' : 'var(--primary)';
             

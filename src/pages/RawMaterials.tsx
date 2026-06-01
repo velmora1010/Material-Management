@@ -1,29 +1,39 @@
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useSupabaseQuery } from '../hooks/useSupabase';
 import { Search, Plus, X } from 'lucide-react';
-import db from '../db/db';
+import { supabase } from '../lib/supabaseClient';
 
 const RawMaterials = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newMaterial, setNewMaterial] = useState({ name: '', unit: 'KG', category: '', description: '', hsn_code: '', color_code: '#2563eb' });
 
-  const materials = useLiveQuery(
-    () => db.raw_materials
-      .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.category.toLowerCase().includes(searchTerm.toLowerCase()))
-      .toArray(),
-    [searchTerm]
+  const { data: materials = [] } = useSupabaseQuery<any>('raw_materials');
+
+  const filteredMaterials = materials.filter(m => 
+    m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    m.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMaterial.name || !newMaterial.category) return;
-    await db.raw_materials.add({ 
-      ...newMaterial, 
-      created_at: new Date().toISOString() 
+    
+    const { error } = await supabase.from('raw_materials').insert({ 
+      ...newMaterial 
     });
+    
+    if (error) {
+      alert("Failed to add material");
+      return;
+    }
+    
     setNewMaterial({ name: '', unit: 'KG', category: '', description: '', hsn_code: '', color_code: '#2563eb' });
     setIsModalOpen(false);
+    // Since we don't have a refetch returned by our simple hook currently, we could just reload or enhance the hook. 
+    // To keep it simple, window.location.reload() or we can just let user refresh if they want.
+    // The user said "Data should stay after browser refresh", but we want UI to update too.
+    window.location.reload();
   };
 
   return (
@@ -48,7 +58,7 @@ const RawMaterials = () => {
       </div>
 
       <div className="grid grid-3">
-        {materials?.map((material) => (
+        {filteredMaterials?.map((material) => (
           <div key={material.id} className="page-card material-card" style={{ padding: '20px' }}>
             <h3 className="material-card-title" style={{ margin: '0 0 16px 0', fontSize: '18px' }}>{material.name}</h3>
             
@@ -60,7 +70,7 @@ const RawMaterials = () => {
             </div>
           </div>
         ))}
-        {materials?.length === 0 && (
+        {filteredMaterials?.length === 0 && (
           <div className="page-card" style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--text-muted)' }}>
             No raw materials found. Click "Add New Material" to create one.
           </div>

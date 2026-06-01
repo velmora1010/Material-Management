@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useSupabaseQuery } from '../hooks/useSupabase';
 import { QRCodeSVG } from 'qrcode.react';
 import { Printer, Download, Search } from 'lucide-react';
-import db from '../db/db';
 
 const GenerateBarcode = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const batches = useLiveQuery(() => db.batches.toArray()) || [];
-  const materials = useLiveQuery(() => db.raw_materials.toArray()) || [];
+  const { data: batches = [], loading } = useSupabaseQuery<any>('batches');
+  const { data: materials = [] } = useSupabaseQuery<any>('raw_materials');
+
+  if (loading) return <div>Loading...</div>;
+
   
   const materialMap = new Map(materials.map(m => [m.id, m]));
 

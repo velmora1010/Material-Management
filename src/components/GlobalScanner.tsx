@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { Scan, X, Printer, PackageCheck } from 'lucide-react';
+import { Scan, X, PackageCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Barcode from 'react-barcode';
-import db from '../db/db';
+import { supabase } from '../lib/supabaseClient';
 
 const GlobalScanner = () => {
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [scanInput, setScanInput] = useState('');
   const [scannedBatch, setScannedBatch] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -32,9 +34,13 @@ const GlobalScanner = () => {
       }
 
       // Try finding the batch by serial_number, batch_id, or barcode_data
-      const batch = await db.batches.where('serial_number').equals(payload).first() 
-                 || await db.batches.where('batch_id').equals(payload).first()
-                 || await db.batches.where('barcode_data').equals(payload).first();
+      const { data: batches } = await supabase
+        .from('batches')
+        .select('*')
+        .or(`serial_number.eq.${payload},batch_id.eq.${payload},barcode_data.eq.${payload}`)
+        .limit(1);
+
+      const batch = batches?.[0];
 
       if (!batch) {
         setError('Batch not found.');
@@ -43,6 +49,10 @@ const GlobalScanner = () => {
 
       setScannedBatch(batch);
       setScanInput('');
+      
+      if (!batch.inventory_room_saved) {
+        setShowConfirm(true);
+      }
     } catch (err) {
       setError('An error occurred while scanning.');
     }
@@ -53,6 +63,29 @@ const GlobalScanner = () => {
     setScannedBatch(null);
     setScanInput('');
     setError(null);
+    setShowConfirm(false);
+  };
+
+  const handleConfirmStockIn = async () => {
+    if (!scannedBatch) return;
+    try {
+      const { error } = await supabase.from('batches').update({
+        inventory_room_saved: true,
+        barcode_status: 'Stock In',
+        stock_in_at: new Date().toISOString()
+      }).eq('id', scannedBatch.id);
+
+      if (error) throw error;
+      
+      setToastMessage('Stock added to Inventory Room successfully');
+      setShowConfirm(false);
+      setScannedBatch({...scannedBatch, inventory_room_saved: true, barcode_status: 'Stock In'});
+      setTimeout(() => setToastMessage(''), 3000);
+      
+    } catch (err) {
+      console.error('Error confirming stock in:', err);
+      setError('Failed to save to Inventory Room.');
+    }
   };
 
   const handleGoToInventory = () => {
@@ -62,6 +95,17 @@ const GlobalScanner = () => {
 
   return (
     <>
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', top: '24px', right: '24px', background: '#10b981', color: 'white',
+          padding: '12px 24px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', zIndex: 100, animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <PackageCheck size={20} />
+          <span style={{ fontWeight: 500 }}>{toastMessage}</span>
+        </div>
+      )}
+
       <button 
         className="btn btn-secondary" 
         style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border)', background: 'var(--surface)' }}
@@ -75,7 +119,7 @@ const GlobalScanner = () => {
         <div className="modal-overlay" onClick={handleClose}>
           <div className="modal-content" style={{ width: scannedBatch ? '500px' : '400px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{scannedBatch ? 'Raw Material Batch Details' : 'Scan Barcode'}</h2>
+              <h2>{scannedBatch ? (showConfirm ? 'Confirm Stock In' : 'Batch Details') : 'Scan Barcode'}</h2>
               <button style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={handleClose}><X size={24} /></button>
             </div>
 
@@ -125,10 +169,10 @@ const GlobalScanner = () => {
                       <span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>Status</span>
                       <span style={{ 
                         padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, display: 'inline-block',
-                        background: scannedBatch.status === 'Active' ? 'var(--success-bg)' : scannedBatch.status === 'Low Stock' ? '#fef3c7' : '#fef2f2',
-                        color: scannedBatch.status === 'Active' ? 'var(--success-text)' : scannedBatch.status === 'Low Stock' ? '#d97706' : '#dc2626'
+                        background: (scannedBatch.barcode_status || 'Barcode Saved') === 'Stock In' ? '#d1fae5' : '#dbeafe',
+                        color: (scannedBatch.barcode_status || 'Barcode Saved') === 'Stock In' ? '#065f46' : '#1e40af'
                       }}>
-                        {scannedBatch.status}
+                        {scannedBatch.barcode_status || 'Barcode Saved'}
                       </span>
                     </div>
                   </div>
@@ -157,25 +201,28 @@ const GlobalScanner = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', marginTop: '12px' }}>
                   <button type="button" className="btn btn-secondary" onClick={handleClose}>Close</button>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => {
-                      const printContent = document.getElementById('print-single-label');
-                      if (printContent) {
-                        const originalBody = document.body.innerHTML;
-                        document.body.innerHTML = printContent.innerHTML;
-                        window.print();
-                        document.body.innerHTML = originalBody;
-                        window.location.reload(); // Quick restore state
-                      }
-                    }}>
-                      <Printer size={16} style={{ marginRight: '6px' }} /> Print Label
+                  
+                  {showConfirm ? (
+                    <button type="button" className="btn btn-primary" onClick={handleConfirmStockIn}>
+                      OK, Add to Inventory Room
                     </button>
-                    <button type="button" className="btn btn-primary" onClick={handleGoToInventory}>
-                      <PackageCheck size={16} style={{ marginRight: '6px' }} /> Go to Inventory Room
-                    </button>
-                  </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '12px', flexDirection: 'column', alignItems: 'flex-end' }}>
+                      {scannedBatch.inventory_room_saved && (
+                         <div style={{ color: '#065f46', background: '#d1fae5', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, marginBottom: '8px', border: '1px solid #34d399' }}>
+                           This barcode is already added to Inventory Room.<br/>
+                           Added: {scannedBatch.stock_in_at ? new Date(scannedBatch.stock_in_at).toLocaleDateString() : 'N/A'}
+                         </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <button type="button" className="btn btn-primary" onClick={handleGoToInventory}>
+                          <PackageCheck size={16} style={{ marginRight: '6px' }} /> Go to Inventory Room
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

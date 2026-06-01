@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Package, Beaker, Factory, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import db from '../../db/db';
+import { useSupabaseQuery } from '../../hooks/useSupabase';
+import { supabase } from '../../lib/supabaseClient';
 import { PRODUCTS, calculateRequiredIngredients } from '../../config/productFormulas';
 
 const NewProductionBatch = () => {
@@ -11,8 +11,7 @@ const NewProductionBatch = () => {
   const [sizeType, setSizeType] = useState<'Full' | 'Micro' | 'Custom' | null>(null);
   const [customUnits, setCustomUnits] = useState<number>(500);
 
-  // DB lookups for stock check
-  const allRawMaterialBatches = useLiveQuery(() => db.batches.toArray()) || [];
+  const { data: allRawMaterialBatches = [] } = useSupabaseQuery<any>('batches');
 
   const selectedProduct = PRODUCTS.find(p => p.id === selectedProductId);
 
@@ -67,7 +66,7 @@ const NewProductionBatch = () => {
     const prodBatchId = `PROD-${dateStr}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
     // 1. Create Production Batch
-    const dbBatchId = await db.production_batches.add({
+    const { data: batchData, error: batchError } = await supabase.from('production_batches').insert({
       production_batch_id: prodBatchId,
       product_name: selectedProduct.name,
       total_units: totalUnits,
@@ -78,19 +77,23 @@ const NewProductionBatch = () => {
       total_micro_batches: microBatches.length,
       completed_micro_batches: 0,
       produced_units: 0,
-      inventory_units: 0,
-      created_at: new Date().toISOString()
-    });
+      inventory_units: 0
+    }).select('id').single();
+
+    if (batchError) {
+      alert("Failed to create production batch");
+      return;
+    }
+    const dbBatchId = batchData.id;
 
     // 2. Create Micro Batches
     const microBatchRecords = microBatches.map(mb => ({
       production_batch_id: prodBatchId,
       micro_batch_no: mb.no,
       units: mb.qty,
-      status: 'Waiting' as const,
-      created_at: new Date().toISOString()
+      status: 'Waiting'
     }));
-    await db.production_micro_batches.bulkAdd(microBatchRecords as any);
+    await supabase.from('production_micro_batches').insert(microBatchRecords);
 
     // 3. Create Required Ingredients
     const ingredientRecords = requiredIngredients.map(ing => ({
@@ -99,9 +102,9 @@ const NewProductionBatch = () => {
       required_quantity: ing.required_quantity,
       available_quantity_at_start: ingredientStatus.find(s => s.name === ing.name)?.available || 0,
       scanned_quantity: 0,
-      status: 'Pending' as const
+      status: 'Pending'
     }));
-    await db.production_ingredients.bulkAdd(ingredientRecords as any);
+    await supabase.from('production_ingredients').insert(ingredientRecords);
 
     // Navigate to detail page
     navigate(`/production/batch/${dbBatchId}`);

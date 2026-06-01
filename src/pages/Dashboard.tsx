@@ -1,21 +1,22 @@
-import { useLiveQuery } from 'dexie-react-hooks';
-
+import { useSupabaseQuery } from '../hooks/useSupabase';
 import { Boxes, Factory, Zap, ArrowUpCircle } from 'lucide-react';
-
-import db from '../db/db';
 
 const Dashboard = () => {
 
   // Dark mode logic removed from Dashboard as it's now in Sidebar
 
   // Raw Material Data
-  const rawMaterials = useLiveQuery(() => db.raw_materials.toArray()) || [];
-  const batches = useLiveQuery(() => db.batches.toArray()) || [];
-  const inventoryIn = useLiveQuery(() => db.inventory_in.orderBy('id').reverse().limit(5).toArray()) || [];
+  const { data: rawMaterials = [], loading: loadingRm } = useSupabaseQuery<any>('raw_materials');
+  const { data: batches = [] } = useSupabaseQuery<any>('batches');
+  const { data: inventoryIn = [] } = useSupabaseQuery<any>('inventory_in', q => q.order('created_at', { ascending: false }).limit(5));
 
   // Production Data
-  const productionBatches = useLiveQuery(() => db.production_batches.orderBy('id').reverse().toArray()) || [];
-  const finishedGoods = useLiveQuery(() => db.finished_goods_inventory.toArray()) || [];
+  const { data: productionBatches = [], loading: loadingPb } = useSupabaseQuery<any>('production_batches', q => q.order('created_at', { ascending: false }));
+  const { data: finishedGoods = [] } = useSupabaseQuery<any>('finished_goods_inventory');
+
+  if (loadingRm || loadingPb) {
+    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 'bold' }}>Loading Dashboard Data...</div>;
+  }
 
   // --- RAW MATERIAL CALCULATIONS ---
   const activeRmBatches = batches.filter(b => b.status === 'Active' || b.status === 'Low Stock');

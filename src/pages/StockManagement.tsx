@@ -1,29 +1,30 @@
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useSupabaseQuery } from '../hooks/useSupabase';
 import * as XLSX from 'xlsx';
 import { Package, Download, Search } from 'lucide-react';
-import db from '../db/db';
 
 const StockManagement = () => {
   const [activeTab, setActiveTab] = useState<'stock' | 'batches'>('stock');
   const [searchTerm, setSearchTerm] = useState('');
   
-  const rawMaterials = useLiveQuery(() => db.raw_materials.toArray()) || [];
-  const batches = useLiveQuery(() => db.batches.toArray()) || [];
+  const { data: rawMaterials = [] } = useSupabaseQuery<any>('raw_materials');
+  const { data: batches = [], loading } = useSupabaseQuery<any>('batches');
+
+  if (loading) return <div>Loading...</div>;
   
-  const materialMap = new Map(rawMaterials.map(m => [m.id, m]));
+  const materialMap = new Map(rawMaterials.map((m: any) => [m.id, m]));
 
-  const currentStock = rawMaterials.map(material => {
-    const matBatches = batches.filter(b => b.material_id === material.id && b.status !== 'Completed');
-    const totalAvail = matBatches.reduce((acc, curr) => acc + curr.available_quantity, 0);
-    const totalOrig = matBatches.reduce((acc, curr) => acc + curr.original_quantity, 0);
-    const totalValue = matBatches.reduce((acc, curr) => acc + (curr.available_quantity * curr.price_per_kg), 0);
+  const currentStock = rawMaterials.map((material: any) => {
+    const matBatches = batches.filter((b: any) => b.material_id === material.id && b.status !== 'Completed');
+    const totalAvail = matBatches.reduce((acc: number, curr: any) => acc + curr.available_quantity, 0);
+    const totalOrig = matBatches.reduce((acc: number, curr: any) => acc + curr.original_quantity, 0);
+    const totalValue = matBatches.reduce((acc: number, curr: any) => acc + (curr.available_quantity * curr.price_per_kg), 0);
     return { ...material, totalAvail, totalOrig, totalValue, batchCount: matBatches.length };
-  }).filter(s => s.totalAvail > 0);
+  }).filter((s: any) => s.totalAvail > 0);
 
-  const totalStockValue = currentStock.reduce((acc, curr) => acc + curr.totalValue, 0);
-  const totalStockKg = currentStock.reduce((acc, curr) => acc + curr.totalAvail, 0);
-  const activeBatchCount = batches.filter(b => b.status === 'Active' || b.status === 'Low Stock').length;
+  const totalStockValue = currentStock.reduce((acc: number, curr: any) => acc + curr.totalValue, 0);
+  const totalStockKg = currentStock.reduce((acc: number, curr: any) => acc + curr.totalAvail, 0);
+  const activeBatchCount = batches.filter((b: any) => b.status === 'Active' || b.status === 'Low Stock').length;
 
   const exportExcel = (data: any[], filename: string) => {
     const ws = XLSX.utils.json_to_sheet(data);
@@ -41,7 +42,7 @@ const StockManagement = () => {
     }
   };
 
-  const filteredBatches = batches.filter(b => {
+  const filteredBatches = batches.filter((b: any) => {
     const mat = materialMap.get(b.material_id);
     const searchString = `${b.batch_id} ${b.vendor_name} ${mat?.name}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
@@ -115,7 +116,7 @@ const StockManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentStock.map(item => (
+                {currentStock.map((item: any) => (
                   <tr key={item.id}>
                     <td style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--surface-soft)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={16}/></div>
@@ -149,7 +150,7 @@ const StockManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredBatches.map(b => {
+                {filteredBatches.map((b: any) => {
                   const material = materialMap.get(b.material_id);
                   const isDepleted = b.available_quantity === 0;
                   return (

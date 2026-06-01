@@ -1,25 +1,31 @@
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useSupabaseQuery } from '../hooks/useSupabase';
 import { PackageCheck, Boxes, ClipboardCheck, Truck, Search, Eye, Download, Printer, Database } from 'lucide-react';
-import db from '../db/db';
 
 const InventoryRoom = () => {
   const [activeTab, setActiveTab] = useState<'raw_material' | 'production' | 'finished_goods'>('raw_material');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch Data
-  const inventoryIn = useLiveQuery(() => db.inventory_in.toArray()) || [];
-  const rawBatches = useLiveQuery(() => db.batches.toArray()) || [];
-  const productionBatches = useLiveQuery(() => db.production_batches.toArray()) || [];
-  const microBatches = useLiveQuery(() => db.production_micro_batches.toArray()) || [];
-  const finishedGoods = useLiveQuery(() => db.finished_goods_inventory.toArray()) || [];
+  const { data: inventoryIn = [], loading: loadingIn } = useSupabaseQuery<any>('inventory_in');
+  const { data: rawBatches = [], loading: loadingBatches } = useSupabaseQuery<any>('batches');
+  const { data: productionBatches = [], loading: loadingProd } = useSupabaseQuery<any>('production_batches');
+  const { data: microBatches = [] } = useSupabaseQuery<any>('production_micro_batches');
+  const { data: finishedGoods = [] } = useSupabaseQuery<any>('finished_goods_inventory');
+
+  if (loadingIn || loadingBatches || loadingProd) {
+    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 'bold' }}>Loading Inventory Data...</div>;
+  }
+
+  // Filter raw batches that have been scanned into inventory
+  const scannedRawBatches = rawBatches.filter(b => b.inventory_room_saved || b.barcode_status === 'Stock In');
 
   // Summary Calcs
-  const totalRawMaterialKG = rawBatches.filter(b => b.status !== 'Depleted').reduce((acc, b) => acc + (b.available_quantity || 0), 0);
-  const rawMaterialValue = rawBatches.filter(b => b.status !== 'Depleted').reduce((acc, b) => acc + (b.batch_value || 0), 0);
+  const totalRawMaterialKG = scannedRawBatches.filter(b => b.status !== 'Depleted').reduce((acc, b) => acc + (b.available_quantity || 0), 0);
+  const rawMaterialValue = scannedRawBatches.filter(b => b.status !== 'Depleted').reduce((acc, b) => acc + (b.batch_value || 0), 0);
   const totalProductionUnits = productionBatches.reduce((acc, b) => acc + (b.total_units || 0), 0);
   const finishedGoodsAvailable = finishedGoods.filter(f => f.status === 'In Stock').reduce((acc, f) => acc + (f.units || 0), 0);
-  const totalBatchesCount = rawBatches.length + productionBatches.length;
+  const totalBatchesCount = scannedRawBatches.length + productionBatches.length;
   const readyForDispatch = finishedGoodsAvailable;
 
   // Enriched Data
@@ -29,13 +35,13 @@ const InventoryRoom = () => {
     item.po_reference?.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
    .map(inv => {
-    const bts = rawBatches.filter(b => b.inventory_in_id === inv.id);
+    const bts = scannedRawBatches.filter(b => b.inventory_in_id === inv.id);
     const available = bts.reduce((sum, b) => sum + (b.available_quantity || 0), 0);
     const numBatches = bts.length;
     const value = bts.reduce((sum, b) => sum + (b.batch_value || 0), 0);
     const status = available <= 0 ? 'Depleted' : available < (inv.quantity_received * 0.2) ? 'Low Stock' : 'Active';
     return { ...inv, available, numBatches, value, status };
-  });
+  }).filter(inv => inv.numBatches > 0); // Only show intake records that have at least one scanned batch
 
   const filteredProd = productionBatches.filter(item => 
     item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 

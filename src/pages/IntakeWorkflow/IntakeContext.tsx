@@ -1,6 +1,14 @@
 import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { RawMaterial } from '../../db/db';
+export interface RawMaterial {
+  id?: string;
+  name: string;
+  unit: string;
+  category: string;
+  description?: string;
+  hsn_code?: string;
+  color_code?: string;
+}
 
 export interface BatchItem {
   id: string;

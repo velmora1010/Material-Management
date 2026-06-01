@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Factory, Building2, ShieldCheck, Warehouse } from 'lucide-react';
-import { seedDatabase } from './db/db';
+import { LayoutDashboard, Database, Factory, Building2, ShieldCheck, Warehouse, ScanBarcode } from 'lucide-react';
+// Removed local database seed
 
 import GlobalHeader from './components/GlobalHeader';
 import Dashboard from './pages/Dashboard';
@@ -16,13 +16,14 @@ import IntakeWorkflow from './pages/IntakeWorkflow/IntakeWorkflow';
 import IntakeStep1_Form from './pages/IntakeWorkflow/IntakeStep1_Form';
 import IntakeStep2_Split from './pages/IntakeWorkflow/IntakeStep2_Split';
 import IntakeStep3_Barcode from './pages/IntakeWorkflow/IntakeStep3_Barcode';
-import IntakeStep4_Success from './pages/IntakeWorkflow/IntakeStep4_Success';
+// IntakeStep4_Success is kept in codebase but not active in routes
 
 import ProductionDashboard from './pages/Production/ProductionDashboard';
 import NewProductionBatch from './pages/Production/NewProductionBatch';
 import ProductionBatchDetail from './pages/Production/ProductionBatchDetail';
 
 import InventoryRoom from './pages/InventoryRoom';
+import ViewBarcode from './pages/ViewBarcode';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -30,7 +31,8 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Raw Material', path: '/raw-material', icon: Database },
     { name: 'Production', path: '/production', icon: Factory },
-    { name: 'Inventory Room', path: '/inventory-room', icon: Warehouse }
+    { name: 'Inventory Room', path: '/inventory-room', icon: Warehouse },
+    { name: 'View Barcode', path: '/view-barcode', icon: ScanBarcode }
   ];
 
   const isModuleActive = (routePath: string) => {
@@ -109,6 +111,73 @@ const Sidebar = () => {
   );
 };
 
+import { supabase } from './lib/supabaseClient';
+
+const cleanupDuplicates = async () => {
+  try {
+    const { data, error } = await supabase.from('raw_materials').select('id, name, created_at').order('created_at', { ascending: true });
+    if (error) throw error;
+    
+    if (data) {
+      const seen = new Set();
+      const toDelete: string[] = [];
+      for (const item of data) {
+        if (seen.has(item.name)) {
+          toDelete.push(item.id);
+        } else {
+          seen.add(item.name);
+        }
+      }
+      
+      if (toDelete.length > 0) {
+        // Delete individually to avoid potential URL length limits on large IN clauses
+        for (const id of toDelete) {
+          await supabase.from('raw_materials').delete().eq('id', id);
+        }
+        console.log(`Cleaned up ${toDelete.length} duplicate materials`);
+      }
+    }
+  } catch (err) {
+    console.error('Cleanup error:', err);
+  }
+};
+
+const seedDatabase = async () => {
+  try {
+    const { data: existingData, error } = await supabase.from('raw_materials').select('name');
+    if (error) throw error;
+    
+    const existingNames = new Set(existingData?.map(m => m.name) || []);
+    
+    const defaultMaterials = [
+      { name: 'SLES Paste', unit: 'KG', category: 'Surfactant', color_code: '#2563eb' },
+      { name: 'CAPB', unit: 'KG', category: 'Surfactant', color_code: '#10b981' },
+      { name: 'Salt', unit: 'KG', category: 'Thickener', color_code: '#64748b' },
+      { name: 'AOS', unit: 'KG', category: 'Surfactant', color_code: '#0284c7' },
+      { name: 'Fragrance - Lemon Blast', unit: 'KG', category: 'Fragrance', color_code: '#eab308' },
+      { name: 'Fragrance - White Flower', unit: 'KG', category: 'Fragrance', color_code: '#fcd34d' },
+      { name: 'Fragrance - Milk Saffron', unit: 'KG', category: 'Fragrance', color_code: '#f59e0b' },
+      { name: 'Comfort Base', unit: 'KG', category: 'Base', color_code: '#3b82f6' },
+      { name: 'Sodium Benzoate', unit: 'KG', category: 'Preservative', color_code: '#ec4899' },
+      { name: 'Phenoxy Ethanol', unit: 'KG', category: 'Preservative', color_code: '#d946ef' },
+      { name: 'N-Cap', unit: 'KG', category: 'Conditioning Agent', color_code: '#8b5cf6' },
+      { name: 'Yellow Colour', unit: 'KG', category: 'Colorant', color_code: '#eab308' },
+      { name: 'Blue Colour', unit: 'KG', category: 'Colorant', color_code: '#3b82f6' },
+      { name: 'Violet Colour', unit: 'KG', category: 'Colorant', color_code: '#8b5cf6' },
+      { name: 'Water', unit: 'KG', category: 'Solvent', color_code: '#0ea5e9' }
+    ];
+
+    const toInsert = defaultMaterials.filter(m => !existingNames.has(m.name));
+    
+    if (toInsert.length > 0) {
+      await supabase.from('raw_materials').insert(toInsert);
+      console.log(`Seeded ${toInsert.length} new raw materials`);
+    }
+  } catch (err) {
+    console.error('Seed error:', err);
+  }
+};
+
 const App = () => {
   const [isReady, setIsReady] = useState(false);
 
@@ -121,14 +190,14 @@ const App = () => {
       document.body.classList.remove('dark');
     }
 
-    const initDb = async () => {
-      await seedDatabase();
-      setIsReady(true);
-    };
-    initDb();
+    cleanupDuplicates().then(() => {
+      seedDatabase().finally(() => {
+        setIsReady(true);
+      });
+    });
   }, []);
 
-  if (!isReady) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 'bold' }}>Loading Database...</div>;
+  if (!isReady) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 'bold' }}>Loading...</div>;
 
   return (
     <Router>
@@ -148,7 +217,6 @@ const App = () => {
                 <Route path="/raw-material" element={<IntakeStep1_Form />} />
                 <Route path="/raw-material/split-batches" element={<IntakeStep2_Split />} />
                 <Route path="/raw-material/generate-barcode" element={<IntakeStep3_Barcode />} />
-                <Route path="/raw-material/confirmation" element={<IntakeStep4_Success />} />
               </Route>
               
               <Route path="/production" element={<ProductionDashboard />} />
@@ -156,6 +224,7 @@ const App = () => {
               <Route path="/production/batch/:id" element={<ProductionBatchDetail />} />
               
               <Route path="/inventory-room" element={<InventoryRoom />} />
+              <Route path="/view-barcode" element={<ViewBarcode />} />
             </Routes>
           </div>
         </main>

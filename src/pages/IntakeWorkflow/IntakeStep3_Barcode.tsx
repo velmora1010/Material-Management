@@ -1,12 +1,16 @@
+import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useIntakeContext } from './IntakeContext';
 import Barcode from 'react-barcode';
-import { Printer, Download, Save } from 'lucide-react';
-import db from '../../db/db';
+import { Printer, Download, Save, CheckCircle } from 'lucide-react';
+import { rawMaterialService } from '../../services/rawMaterialService';
+import { supabase } from '../../lib/supabaseClient';
 
 const IntakeStep3_Barcode = () => {
   const navigate = useNavigate();
-  const { selectedMaterial, formData, batches, setSavedBatchIds } = useIntakeContext();
+  const { selectedMaterial, formData, batches, setSavedBatchIds, setFormData, setBatches, setSelectedMaterial } = useIntakeContext();
+  const [isSaved, setIsSaved] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   if (!selectedMaterial || batches.length === 0) {
     return <Navigate to="/raw-material/intake" replace />;
@@ -27,55 +31,83 @@ const IntakeStep3_Barcode = () => {
     return { ...b, serialNumber };
   });
 
-  const handleSaveToStock = async () => {
-    const invInId = await db.inventory_in.add({
-      material_id: Number(selectedMaterial.id), 
-      material_name: selectedMaterial.name,
-      quantity_received: targetQty,
-      vendor_name: formData.vendor_name, 
-      po_reference: formData.po_reference,
-      price_per_kg: Number(formData.price_per_kg), 
-      gst_percent: Number(formData.gst_percent),
-      base_amount: baseAmount, 
-      gst_amount: gstAmount, 
-      total_amount: totalAmount,
-      notes: formData.notes, 
-      date_received: formData.date_received || new Date().toISOString(), 
-      created_at: new Date().toISOString()
-    });
-
-    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
-
-    const finalBatches = previewBatches.map(b => {
-      const batchId = `MAT-${dateStr}-${productCode}-${String(b.batch_no).padStart(3, '0')}`;
-      const batchValue = b.quantity * Number(formData.price_per_kg) * (1 + (Number(formData.gst_percent)/100));
+  const handleSaveBarcode = async () => {
+    try {
+      // Prevent duplicates by checking if serial numbers exist
+      const serials = previewBatches.map(b => b.serialNumber);
+      const { data: existingBatches } = await supabase.from('batches').select('serial_number').in('serial_number', serials);
       
-      // Remove QR JSON logic. The barcode only needs to store the serial number (batch_id).
-      const qrDataPayload = b.serialNumber;
+      const existingSerials = new Set(existingBatches?.map(eb => eb.serial_number) || []);
+      
+      const newBatches = previewBatches.filter(b => !existingSerials.has(b.serialNumber));
+      
+      if (newBatches.length > 0) {
+        const inventoryInRecord = {
+          material_id: selectedMaterial.id, 
+          material_name: selectedMaterial.name,
+          quantity_received: targetQty,
+          vendor_name: formData.vendor_name, 
+          po_reference: formData.po_reference,
+          price_per_kg: Number(formData.price_per_kg), 
+          gst_percent: Number(formData.gst_percent),
+          base_amount: baseAmount, 
+          gst_amount: gstAmount, 
+          total_amount: totalAmount,
+          date_received: formData.date_received || new Date().toISOString(),
+          notes: formData.notes
+        };
 
-      return {
-        batch_id: batchId, 
-        serial_number: b.serialNumber,
-        inventory_in_id: Number(invInId), 
-        material_id: Number(selectedMaterial.id),
-        material_name: selectedMaterial.name,
-        batch_number: b.batch_no, 
-        original_quantity: b.quantity, 
-        available_quantity: b.quantity,
-        vendor_name: formData.vendor_name, 
-        po_reference: formData.po_reference,
-        price_per_kg: Number(formData.price_per_kg), 
-        gst_percent: Number(formData.gst_percent),
-        batch_value: batchValue,
-        barcode_data: qrDataPayload,
-        status: 'Active' as const, 
-        created_at: new Date().toISOString()
-      };
-    });
+        const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
 
-    const savedIds = await db.batches.bulkAdd(finalBatches as any, { allKeys: true });
-    setSavedBatchIds(savedIds as number[]);
-    navigate('/raw-material/confirmation');
+        const finalBatches = newBatches.map(b => {
+          const batchId = `MAT-${dateStr}-${productCode}-${String(b.batch_no).padStart(3, '0')}`;
+          const batchValue = b.quantity * Number(formData.price_per_kg) * (1 + (Number(formData.gst_percent)/100));
+          const qrDataPayload = b.serialNumber;
+
+          // Validation
+          if (!selectedMaterial.name || !batchId || !qrDataPayload || b.quantity == null || !formData.vendor_name) {
+            throw new Error("Missing required fields for batch generation.");
+          }
+
+          return {
+            batch_id: batchId, 
+            serial_number: b.serialNumber,
+            material_id: selectedMaterial.id,
+            material_name: selectedMaterial.name,
+            batch_number: b.batch_no, 
+            original_quantity: b.quantity, 
+            available_quantity: b.quantity,
+            vendor_name: formData.vendor_name, 
+            po_reference: formData.po_reference,
+            price_per_kg: Number(formData.price_per_kg), 
+            gst_percent: Number(formData.gst_percent),
+            batch_value: batchValue,
+            barcode_data: qrDataPayload,
+            status: 'Active',
+            inventory_room_saved: false,
+            barcode_status: 'Barcode Saved'
+          };
+        });
+
+        const savedIds = await rawMaterialService.saveRawMaterialIntake(inventoryInRecord, finalBatches);
+        setSavedBatchIds(savedIds as any);
+      }
+      
+      setIsSaved(true);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      
+    } catch (err: any) {
+      console.error("Save barcode Supabase error:", err);
+      alert(`Failed to save barcode: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleReceiveAnother = () => {
+    setSelectedMaterial(null);
+    setFormData({ quantity_received: '', vendor_name: '', po_reference: '', price_per_kg: '', gst_percent: '18', notes: '', date_received: new Date().toISOString().slice(0,10) });
+    setBatches([]);
+    navigate('/raw-material');
   };
 
   const downloadQR = (serial: string) => {
@@ -110,6 +142,27 @@ const IntakeStep3_Barcode = () => {
 
   return (
     <>
+      {showToast && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          background: '#10b981',
+          color: 'white',
+          padding: '12px 24px',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          zIndex: 50,
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <CheckCircle size={20} />
+          <span style={{ fontWeight: 500 }}>Barcode saved successfully</span>
+        </div>
+      )}
+
       <div className="page-header">
         <h1>Step 3: Generate Barcode Labels</h1>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -118,9 +171,6 @@ const IntakeStep3_Barcode = () => {
           </button>
           <button className="btn btn-secondary" onClick={handleDownloadAll}>
             <Download size={16} /> Download All
-          </button>
-          <button className="btn btn-primary" onClick={handleSaveToStock}>
-            <Save size={16} /> Save to Stock
           </button>
         </div>
       </div>
@@ -172,12 +222,21 @@ const IntakeStep3_Barcode = () => {
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-secondary" onClick={() => navigate('/')}>Home</button>
-          <button className="btn btn-secondary" onClick={() => navigate('/raw-material/split-batches')}>Back</button>
-        </div>
-        <button className="btn btn-primary" onClick={handleSaveToStock}><Save size={18} /> Save to Stock</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+        {!isSaved ? (
+          <>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={() => navigate('/')}>Home</button>
+              <button className="btn btn-secondary" onClick={() => navigate('/raw-material/split-batches')}>Back</button>
+            </div>
+            <button className="btn btn-primary" onClick={handleSaveBarcode}><Save size={18} /> Save Barcode</button>
+          </>
+        ) : (
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', width: '100%' }}>
+            <button className="btn btn-secondary" onClick={handleReceiveAnother}>Receive Another Material</button>
+            <button className="btn btn-primary" onClick={() => navigate('/view-barcode')}>Go to View Barcode</button>
+          </div>
+        )}
       </div>
     </>
   );
