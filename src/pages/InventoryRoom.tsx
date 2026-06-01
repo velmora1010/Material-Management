@@ -1,24 +1,27 @@
 import { useState } from 'react';
 import { useSupabaseQuery } from '../hooks/useSupabase';
-import { PackageCheck, Boxes, ClipboardCheck, Truck, Search, Eye, Download, Printer, Database } from 'lucide-react';
+import { PackageCheck, Boxes, ClipboardCheck, Truck, Search, Eye, Download, Printer, Database, X } from 'lucide-react';
 
 const InventoryRoom = () => {
   const [activeTab, setActiveTab] = useState<'raw_material' | 'production' | 'finished_goods'>('raw_material');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
 
-  // Fetch Data
-  const { data: inventoryIn = [], loading: loadingIn } = useSupabaseQuery<any>('inventory_in');
   const { data: rawBatches = [], loading: loadingBatches } = useSupabaseQuery<any>('batches');
   const { data: productionBatches = [], loading: loadingProd } = useSupabaseQuery<any>('production_batches');
   const { data: microBatches = [] } = useSupabaseQuery<any>('production_micro_batches');
   const { data: finishedGoods = [] } = useSupabaseQuery<any>('finished_goods_inventory');
 
-  if (loadingIn || loadingBatches || loadingProd) {
+  if (loadingBatches || loadingProd) {
     return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 'bold' }}>Loading Inventory Data...</div>;
   }
 
   // Filter raw batches that have been scanned into inventory
-  const scannedRawBatches = rawBatches.filter(b => b.inventory_room_saved || b.barcode_status === 'Stock In');
+  const scannedRawBatches = rawBatches.filter(b => 
+    b.inventory_room_saved === true || 
+    b.barcode_status === 'Stock In' ||
+    b.status === 'Stock In'
+  ).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Summary Calcs
   const totalRawMaterialKG = scannedRawBatches.filter(b => b.status !== 'Depleted').reduce((acc, b) => acc + (b.available_quantity || 0), 0);
@@ -29,19 +32,13 @@ const InventoryRoom = () => {
   const readyForDispatch = finishedGoodsAvailable;
 
   // Enriched Data
-  const filteredRaw = inventoryIn.filter(item => 
+  const filteredRaw = scannedRawBatches.filter(item => 
     item.material_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.po_reference?.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-   .map(inv => {
-    const bts = scannedRawBatches.filter(b => b.inventory_in_id === inv.id);
-    const available = bts.reduce((sum, b) => sum + (b.available_quantity || 0), 0);
-    const numBatches = bts.length;
-    const value = bts.reduce((sum, b) => sum + (b.batch_value || 0), 0);
-    const status = available <= 0 ? 'Depleted' : available < (inv.quantity_received * 0.2) ? 'Low Stock' : 'Active';
-    return { ...inv, available, numBatches, value, status };
-  }).filter(inv => inv.numBatches > 0); // Only show intake records that have at least one scanned batch
+    item.po_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.batch_number?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const filteredProd = productionBatches.filter(item => 
     item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -58,6 +55,36 @@ const InventoryRoom = () => {
     item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.barcode_data?.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a,b) => new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime());
+
+  const defaultMaterials = [
+    'SLES Paste', 'CAPB', 'Salt', 'AOS', 'Fragrance - Lemon Blast',
+    'Fragrance - White Flower', 'Fragrance - Milk Saffron', 'Comfort Base',
+    'Sodium Benzoate', 'Phenoxy Ethanol', 'N-Cap', 'Yellow Colour',
+    'Blue Colour', 'Violet Colour', 'Water'
+  ];
+
+  const overviewCards = defaultMaterials.map(mat => {
+    const batches = scannedRawBatches.filter(b => b.material_name === mat);
+    const totalBatches = batches.length;
+    const totalKG = batches.reduce((sum, b) => sum + (b.original_quantity || 0), 0);
+    const availableKG = batches.reduce((sum, b) => sum + (b.available_quantity ?? b.original_quantity ?? 0), 0);
+    const usedKG = totalKG - availableKG;
+    
+    let accentColor = 'var(--primary)';
+    let accentBg = 'var(--surface-soft)';
+    let shortCode = mat.substring(0, 3).toUpperCase();
+    
+    if (mat.includes('SLES')) { accentColor = '#3b82f6'; accentBg = 'rgba(59, 130, 246, 0.1)'; shortCode = '1B, 1Y'; }
+    if (mat.includes('CAPB')) { accentColor = '#0d9488'; accentBg = 'rgba(13, 148, 136, 0.1)'; shortCode = '2C'; }
+    if (mat.includes('Salt')) { accentColor = '#eab308'; accentBg = 'rgba(234, 179, 8, 0.1)'; shortCode = '3S'; }
+    if (mat.includes('AOS')) { accentColor = '#a855f7'; accentBg = 'rgba(168, 85, 247, 0.1)'; shortCode = '4A'; }
+    if (mat.includes('Lemon')) { accentColor = '#22c55e'; accentBg = 'rgba(34, 197, 94, 0.1)'; shortCode = 'FL'; }
+    if (mat.includes('White')) { accentColor = '#14b8a6'; accentBg = 'rgba(20, 184, 166, 0.1)'; shortCode = 'FW'; }
+    if (mat.includes('Saffron')) { accentColor = '#10b981'; accentBg = 'rgba(16, 185, 129, 0.1)'; shortCode = 'FM'; }
+    if (mat.includes('Comfort')) { accentColor = '#f97316'; accentBg = 'rgba(249, 115, 22, 0.1)'; shortCode = 'CB'; }
+
+    return { name: mat, totalKG, availableKG, usedKG, totalBatches, accentColor, accentBg, shortCode };
+  });
 
   return (
     <div className="page" style={{ paddingBottom: '64px' }}>
@@ -119,6 +146,53 @@ const InventoryRoom = () => {
         </div>
       </div>
 
+      {/* INVENTORY OVERVIEW SECTION */}
+      <div style={{ marginBottom: '40px' }}>
+        <div style={{ marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '20px', margin: '0 0 4px 0' }}>Inventory Overview</h2>
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '14px' }}>Product-wise raw material stock, available quantity, used quantity, and batch count.</p>
+        </div>
+        
+        <div className="grid grid-4">
+          {overviewCards.map(card => (
+            <div key={card.name} className="page-card" style={{ 
+              padding: '16px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '14px',
+              borderTop: `4px solid ${card.accentColor}`, background: 'var(--surface)'
+            }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ padding: '8px', background: card.accentBg, borderRadius: '10px', height: 'fit-content' }}>
+                    <Database size={20} color={card.accentColor} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: '0 0 2px 0', fontSize: '15px', color: 'var(--text-primary)', fontWeight: 600 }}>{card.name}</h3>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>{card.shortCode}</div>
+                  </div>
+                </div>
+                
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text-primary)', lineHeight: '1.2' }}>{card.totalKG.toFixed(1)}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>kg in stock</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                <div style={{ flex: 1, padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#10b981' }}>{card.availableKG.toFixed(1)}kg</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Available</div>
+                </div>
+                <div style={{ flex: 1, padding: '8px 10px', background: 'var(--surface-soft)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ef4444' }}>{card.usedKG.toFixed(1)}kg</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Used</div>
+                </div>
+              </div>
+
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* SEARCH AND TABS */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', gap: '20px' }}>
         <div style={{ display: 'flex', gap: '4px', background: 'var(--surface-soft)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -166,13 +240,14 @@ const InventoryRoom = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)' }}>
-                  <th style={{ padding: '16px', fontWeight: 600 }}>Date</th>
+                  <th style={{ padding: '16px', fontWeight: 600 }}>Scanned Date</th>
                   <th style={{ padding: '16px', fontWeight: 600 }}>Material Name</th>
+                  <th style={{ padding: '16px', fontWeight: 600 }}>Barcode No</th>
+                  <th style={{ padding: '16px', fontWeight: 600 }}>Batch No</th>
                   <th style={{ padding: '16px', fontWeight: 600 }}>Vendor Name</th>
                   <th style={{ padding: '16px', fontWeight: 600 }}>PO / Bill No</th>
-                  <th style={{ padding: '16px', fontWeight: 600 }}>Total Received</th>
+                  <th style={{ padding: '16px', fontWeight: 600 }}>Quantity KG</th>
                   <th style={{ padding: '16px', fontWeight: 600 }}>Available KG</th>
-                  <th style={{ padding: '16px', fontWeight: 600 }}>Batches</th>
                   <th style={{ padding: '16px', fontWeight: 600 }}>Total Value</th>
                   <th style={{ padding: '16px', fontWeight: 600 }}>Status</th>
                   <th style={{ padding: '16px', fontWeight: 600 }}>Action</th>
@@ -180,33 +255,36 @@ const InventoryRoom = () => {
               </thead>
               <tbody>
                 {filteredRaw.length === 0 ? (
-                  <tr><td colSpan={10} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
+                  <tr><td colSpan={11} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
                 ) : (
                   filteredRaw.map(row => (
                     <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '16px' }}>{new Date(row.created_at).toLocaleDateString()}</td>
+                      <td style={{ padding: '16px' }}>{new Date(row.stock_in_at || row.created_at).toLocaleDateString()}</td>
                       <td style={{ padding: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>{row.material_name}</td>
+                      <td style={{ padding: '16px', fontFamily: 'monospace' }}>{row.serial_number}</td>
+                      <td style={{ padding: '16px' }}>{row.batch_number}</td>
                       <td style={{ padding: '16px' }}>{row.vendor_name || '--'}</td>
                       <td style={{ padding: '16px' }}>{row.po_reference || '--'}</td>
-                      <td style={{ padding: '16px' }}>{row.quantity_received} KG</td>
-                      <td style={{ padding: '16px', fontWeight: 'bold', color: 'var(--primary)' }}>{row.available.toFixed(1)} KG</td>
-                      <td style={{ padding: '16px' }}>{row.numBatches}</td>
-                      <td style={{ padding: '16px', fontWeight: 500 }}>₹{row.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                      <td style={{ padding: '16px' }}>{row.original_quantity} KG</td>
+                      <td style={{ padding: '16px', fontWeight: 'bold', color: 'var(--primary)' }}>{row.available_quantity?.toFixed(1) ?? row.original_quantity} KG</td>
+                      <td style={{ padding: '16px', fontWeight: 500 }}>₹{row.batch_value?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? 0}</td>
                       <td style={{ padding: '16px' }}>
                         <span style={{ 
                           padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600,
-                          background: row.status === 'Active' ? 'var(--success-bg)' : row.status === 'Low Stock' ? '#fef3c7' : '#fef2f2',
-                          color: row.status === 'Active' ? 'var(--success-text)' : row.status === 'Low Stock' ? '#d97706' : '#dc2626'
+                          background: 'var(--success-bg)',
+                          color: 'var(--success-text)'
                         }}>
-                          {row.status}
+                          Stock In
                         </span>
                       </td>
                       <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn btn-secondary" style={{ padding: '4px 8px', height: 'auto', fontSize: '12px' }}><Eye size={14}/></button>
-                          <button className="btn btn-secondary" style={{ padding: '4px 8px', height: 'auto', fontSize: '12px' }}><Boxes size={14}/></button>
-                          <button className="btn btn-secondary" style={{ padding: '4px 8px', height: 'auto', fontSize: '12px' }}><Printer size={14}/></button>
-                        </div>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '4px 8px', height: 'auto', fontSize: '12px' }}
+                          onClick={() => setSelectedBatch(row)}
+                        >
+                          <Eye size={14}/>
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -321,6 +399,96 @@ const InventoryRoom = () => {
         )}
 
       </div>
+
+      {selectedBatch && (
+        <div className="modal-overlay" onClick={() => setSelectedBatch(null)}>
+          <div className="modal-content" style={{ width: '600px', maxWidth: '95%' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Raw Material Stock Details</h2>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setSelectedBatch(null)}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Material Name</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{selectedBatch.material_name}</div>
+              </div>
+              <div className="form-group">
+                <label>Barcode Number</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500, fontFamily: 'monospace' }}>{selectedBatch.serial_number}</div>
+              </div>
+              <div className="form-group">
+                <label>Batch ID</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500, fontFamily: 'monospace', fontSize: '12px' }}>{selectedBatch.batch_id}</div>
+              </div>
+              <div className="form-group">
+                <label>Batch Number</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{selectedBatch.batch_number}</div>
+              </div>
+              <div className="form-group">
+                <label>Quantity KG</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{selectedBatch.original_quantity} KG</div>
+              </div>
+              <div className="form-group">
+                <label>Available KG</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500, color: selectedBatch.available_quantity > 0 ? 'var(--text-primary)' : '#dc2626' }}>
+                  {selectedBatch.available_quantity ?? selectedBatch.original_quantity} KG
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Vendor</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{selectedBatch.vendor_name || '--'}</div>
+              </div>
+              <div className="form-group">
+                <label>PO Reference</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{selectedBatch.po_reference || '--'}</div>
+              </div>
+              <div className="form-group">
+                <label>Received Date</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{new Date(selectedBatch.created_at).toISOString().slice(0,10)}</div>
+              </div>
+              <div className="form-group">
+                <label>Stock In Date</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{selectedBatch.stock_in_at ? new Date(selectedBatch.stock_in_at).toISOString().slice(0,10) : new Date(selectedBatch.created_at).toISOString().slice(0,10)}</div>
+              </div>
+              <div className="form-group">
+                <label>Price Per KG</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>₹{selectedBatch.price_per_kg || 0}</div>
+              </div>
+              <div className="form-group">
+                <label>GST %</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500 }}>{selectedBatch.gst_percent || 0}%</div>
+              </div>
+              <div className="form-group">
+                <label>Batch Value</label>
+                <div style={{ padding: '10px', background: 'var(--surface-soft)', borderRadius: '6px', fontWeight: 500, color: 'var(--primary)' }}>₹{selectedBatch.batch_value?.toFixed(2) || 0}</div>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <div style={{ 
+                  padding: '10px', 
+                  borderRadius: '6px', 
+                  fontWeight: 600, 
+                  textAlign: 'center',
+                  background: '#d1fae5',
+                  color: '#065f46',
+                  border: `1px solid #34d399`
+                }}>
+                  Stock In
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+              <button className="btn btn-secondary" onClick={() => setSelectedBatch(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
