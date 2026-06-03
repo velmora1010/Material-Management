@@ -63,7 +63,7 @@ const IntakeStep2_Split = () => {
         <h1>Step 2: Split Batches</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '24px' }}>
         <div>
           <div className="page-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -71,28 +71,30 @@ const IntakeStep2_Split = () => {
               <button className="btn btn-secondary" onClick={handleAutoSplit}>Auto Split</button>
             </div>
 
-            <table style={{ marginBottom: '20px' }}>
-              <thead>
-                <tr>
-                  <th>Batch #</th>
-                  <th>Quantity (KG)</th>
-                  <th style={{ width: '60px' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batches.map((b) => (
-                  <tr key={b.id}>
-                    <td><input type="number" min="1" value={b.batch_no} onChange={e => updateBatch(b.id, 'batch_no', e.target.value)} /></td>
-                    <td><input type="number" step="0.1" value={b.quantity} onChange={e => updateBatch(b.id, 'quantity', e.target.value)} /></td>
-                    <td>
-                      <button className="btn btn-danger" onClick={() => deleteBatchRow(b.id)} style={{ width: '40px', padding: 0 }}>
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
+            <div className="table-responsive">
+              <table style={{ marginBottom: '20px', width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th>Batch #</th>
+                    <th>Quantity (KG)</th>
+                    <th style={{ width: '60px' }}>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {batches.map((b) => (
+                    <tr key={b.id}>
+                      <td><input type="number" min="1" value={b.batch_no} onChange={e => updateBatch(b.id, 'batch_no', e.target.value)} /></td>
+                      <td><input type="number" step="0.1" value={b.quantity} onChange={e => updateBatch(b.id, 'quantity', e.target.value)} /></td>
+                      <td>
+                        <button className="btn btn-danger" onClick={() => deleteBatchRow(b.id)} style={{ width: '40px', padding: 0 }}>
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             <button className="btn btn-secondary" style={{ width: '100%', marginBottom: '20px' }} onClick={addBatchRow}>
               <Plus size={18} /> Add Batch Row

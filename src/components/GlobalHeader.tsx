@@ -1,8 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, ArrowLeft, Bell, MapPin, UserCircle2 } from 'lucide-react';
+import { Home, ArrowLeft, Bell, MapPin, UserCircle2, Menu } from 'lucide-react';
 import GlobalScanner from './GlobalScanner';
 
-const GlobalHeader = () => {
+const GlobalHeader = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -27,6 +27,15 @@ const GlobalHeader = () => {
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <div className="header-actions">
           <button 
+            onClick={toggleSidebar} 
+            className="icon-btn hamburger-btn"
+            title="Open Menu"
+            style={{ display: 'none' }} /* Hidden by default, shown via CSS media query */
+          >
+            <Menu size={20} strokeWidth={2.2} />
+          </button>
+
+          <button 
             onClick={() => navigate('/')} 
             className="icon-btn"
             title="Go to Dashboard"
@@ -45,7 +54,7 @@ const GlobalHeader = () => {
         
         <div style={{ height: '24px', width: '1px', background: 'var(--border)', marginRight: '20px' }}></div>
         
-        <h2 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{getTitle()}</h2>
+        <h2 className="header-title" style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{getTitle()}</h2>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>

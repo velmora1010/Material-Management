@@ -255,7 +255,7 @@ const InventoryRoom = () => {
         
         {/* RAW MATERIAL TAB */}
         {activeTab === 'raw_material' && (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)' }}>
@@ -315,7 +315,7 @@ const InventoryRoom = () => {
 
         {/* PRODUCTION STOCK TAB */}
         {activeTab === 'production' && (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)' }}>
@@ -369,7 +369,7 @@ const InventoryRoom = () => {
 
         {/* FINISHED GOODS INVENTORY TAB */}
         {activeTab === 'finished_goods' && (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)' }}>

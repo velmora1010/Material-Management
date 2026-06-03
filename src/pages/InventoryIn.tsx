@@ -197,7 +197,7 @@ const InventoryIn = () => {
                 <button className="btn btn-secondary" onClick={() => autoSplitBatches(batches.length || 1)}>Auto Split</button>
               </div>
               
-              <table style={{ marginBottom: '20px' }}>
+              <div className="table-responsive"><table style={{ marginBottom: '20px', width: '100%' }}>
                 <thead>
                   <tr>
                     <th>Batch #</th>
@@ -215,6 +215,7 @@ const InventoryIn = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               <button className="btn btn-secondary" style={{ width: '100%', marginBottom: '20px' }} onClick={addBatchRow}>
                 <Plus size={18} /> Add New Batch Row

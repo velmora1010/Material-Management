@@ -223,7 +223,7 @@ const NewProductionBatch = () => {
                 <p style={{ margin: 0, fontSize: '14px' }}>Please set up the formula for {selectedProduct.name} to proceed.</p>
               </div>
             ) : (
-              <div>
+              <div className="table-responsive">
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', marginBottom: '24px' }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)', textAlign: 'left' }}>

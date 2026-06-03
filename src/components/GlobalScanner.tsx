@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Scan, X, PackageCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { sendScanWebhook } from '../services/webhookService';
 
 const GlobalScanner = () => {
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -36,27 +37,60 @@ const GlobalScanner = () => {
 
     try {
       console.log("Detected barcode:", code);
-      console.log("Searching Supabase batches for:", code);
+      console.log("Searching barcode:", code);
 
+      // Fallback search logic: try exact match on serial_number, batch_id, barcode_data
+      // If not found, fetch recent rows and parse JSON barcode_data
       const { data, error: sbError } = await supabase
         .from('batches')
         .select('*')
-        .or(`serial_number.eq.${code},batch_id.eq.${code},barcode_data.eq.${code}`)
-        .maybeSingle();
+        .order('created_at', { ascending: false })
+        .limit(200);
 
-      console.log("Supabase result:", data, sbError);
+      console.log("Barcode search result:", data, sbError);
 
-      if (sbError || !data) {
+      if (sbError || !data || data.length === 0) {
+        setIsProcessing(false);
+        setError(`Barcode not found in recent database`);
+        return;
+      }
+
+      let foundBatch = null;
+
+      // 1, 2, 3: Exact matches
+      foundBatch = data.find(item => 
+        item.serial_number === code || 
+        item.batch_id === code || 
+        item.barcode_data === code
+      );
+
+      // 4: Parse JSON matches
+      if (!foundBatch) {
+        foundBatch = data.find(item => {
+          if (!item.barcode_data) return false;
+          try {
+            const parsed = JSON.parse(item.barcode_data);
+            return parsed.barcode_no === code || 
+                   parsed.batchId === code || 
+                   parsed.serial_number === code || 
+                   parsed.barcodeNo === code;
+          } catch (e) {
+            return false;
+          }
+        });
+      }
+
+      if (!foundBatch) {
         setIsProcessing(false);
         setError(`Barcode not found`);
         return;
       }
 
-      setScannedBatch(data);
-      setScanInput('');
+      setScannedBatch(foundBatch);
+      setScanInput(code); // Update the input field with the found code
       setIsProcessing(false);
       
-      const isAlreadyScanned = data.inventory_room_saved || data.barcode_status === 'Stock In';
+      const isAlreadyScanned = foundBatch.inventory_room_saved || foundBatch.barcode_status === 'Stock In' || foundBatch.status === 'Stock In';
       setShowConfirm(!isAlreadyScanned);
     } catch (err) {
       console.error(err);
@@ -80,6 +114,8 @@ const GlobalScanner = () => {
       }
 
       lastKeyTime.current = currentTime;
+
+      console.log("Scanner key:", e.key);
 
       if (e.key === 'Enter') {
         const code = scannerBuffer.current.trim();
@@ -115,15 +151,19 @@ const GlobalScanner = () => {
       const { error } = await supabase.from('batches').update({
         inventory_room_saved: true,
         barcode_status: 'Stock In',
+        status: 'Stock In',
         stock_in_at: new Date().toISOString()
       }).eq('id', scannedBatch.id);
 
       if (error) throw error;
       
+      // Send webhook after successful DB update
+      await sendScanWebhook(scannedBatch);
+      
       setToastMessage('Barcode scanned successfully');
       setShowConfirm(false);
-      setScannedBatch({...scannedBatch, inventory_room_saved: true, barcode_status: 'Stock In'});
-      
+      setScannedBatch({...scannedBatch, inventory_room_saved: true, barcode_status: 'Stock In', status: 'Stock In'});
+
       setTimeout(() => {
         setToastMessage('');
         setIsScanModalOpen(false);
@@ -151,7 +191,7 @@ const GlobalScanner = () => {
       )}
 
       <button 
-        className="btn btn-secondary" 
+        className="btn btn-secondary scanner-header-btn" 
         style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border)', background: 'var(--surface)' }}
         onClick={() => setIsScanModalOpen(true)}
       >

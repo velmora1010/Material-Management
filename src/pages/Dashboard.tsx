@@ -104,7 +104,7 @@ const Dashboard = () => {
         {/* SECTION 3: RECENT RAW MATERIAL ACTIVITY */}
         <div className="page-card">
           <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Recent Raw Material Intake</h3>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)' }}>
@@ -138,7 +138,7 @@ const Dashboard = () => {
         {/* SECTION 4: RECENT PRODUCTION ACTIVITY */}
         <div className="page-card">
           <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Recent Production Activity</h3>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)' }}>

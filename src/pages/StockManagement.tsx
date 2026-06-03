@@ -102,7 +102,7 @@ const StockManagement = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-responsive">
           {activeTab === 'stock' && (
             <table>
               <thead>

@@ -4,6 +4,7 @@ import { LayoutDashboard, Database, Factory, Building2, ShieldCheck, Warehouse, 
 // Removed local database seed
 
 import GlobalHeader from './components/GlobalHeader';
+import MobileDepartmentToggle from './components/MobileDepartmentToggle';
 import Dashboard from './pages/Dashboard';
 
 // Removed RawMaterialModule
@@ -25,7 +26,7 @@ import ProductionBatchDetail from './pages/Production/ProductionBatchDetail';
 import InventoryRoom from './pages/InventoryRoom';
 import ViewBarcode from './pages/ViewBarcode';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (val: boolean) => void }) => {
   const location = useLocation();
   const routes = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -59,7 +60,9 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="sidebar">
+    <>
+      <div className={`sidebar-overlay ${isOpen ? 'open' : ''}`} onClick={() => setIsOpen(false)}></div>
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       
       {/* Centered Header */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
@@ -78,6 +81,7 @@ const Sidebar = () => {
               key={r.path} 
               to={r.path} 
               className={`nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setIsOpen(false)}
             >
               <Icon strokeWidth={isActive ? 2.5 : 2} />
               <span>{r.name}</span>
@@ -107,7 +111,8 @@ const Sidebar = () => {
         </div>
       </div>
       
-    </aside>
+      </aside>
+    </>
   );
 };
 
@@ -180,6 +185,7 @@ const seedDatabase = async () => {
 
 const App = () => {
   const [isReady, setIsReady] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     // Apply Dark Mode if user previously selected it
@@ -202,9 +208,10 @@ const App = () => {
   return (
     <Router>
       <div className="app-shell">
-        <Sidebar />
+        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
         <main className="main-content">
-          <GlobalHeader />
+          <GlobalHeader toggleSidebar={() => setIsSidebarOpen(true)} />
+          <MobileDepartmentToggle />
           <div className="page-content">
             <Routes>
               <Route path="/" element={<Dashboard />} />

@@ -365,7 +365,7 @@ const ProductionBatchDetail = () => {
           
           <div className="page-card">
             <h2 style={{ fontSize: '18px', margin: '0 0 16px 0' }}>Stage 2: Micro Batches Execution</h2>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-responsive">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-soft)', borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
