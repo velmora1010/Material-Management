@@ -90,8 +90,39 @@ const ProductionBatchDetail = () => {
 
   const handleStartMicroBatches = async () => {
     if (!productionBatch) return;
-    await supabase.from('production_batches').update({ status: 'In Progress' }).eq('id', productionBatch.id);
-    refetchBatch();
+
+    console.log("Start Micro Batches clicked");
+    console.log("Production batch:", productionBatch);
+    console.log("Micro batches:", microBatches);
+
+    try {
+      if (microBatches.length === 0 && productionBatch.total_micro_batches > 0) {
+        const unitsPerBatch = Math.floor(productionBatch.total_units / productionBatch.total_micro_batches);
+        
+        const newMicroBatches = Array.from({ length: productionBatch.total_micro_batches }, (_, i) => ({
+          production_batch_id: productionBatch.production_batch_id,
+          micro_batch_no: i + 1,
+          units: unitsPerBatch,
+          status: 'Waiting'
+        }));
+
+        const { error: insertError } = await supabase.from('production_micro_batches').insert(newMicroBatches);
+        if (insertError) throw insertError;
+      }
+
+      const { error: updateError } = await supabase
+        .from('production_batches')
+        .update({ status: 'In Progress' })
+        .eq('id', productionBatch.id);
+
+      if (updateError) throw updateError;
+
+      refetchBatch();
+      refetchMb();
+    } catch (error: any) {
+      console.error("Start Micro Batches failed:", error);
+      alert(error.message || "Failed to start micro batches");
+    }
   };
 
   const handlePassMicroBatch = async (mb: any) => {
