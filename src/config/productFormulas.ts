@@ -23,9 +23,7 @@ export const PRODUCTS: ProductConfig[] = [
       { name: 'CAPB', quantity_for_500_units: 50 },
       { name: 'Salt', quantity_for_500_units: 150 },
       { name: 'Sodium Benzoate', quantity_for_500_units: 2.5 },
-      { name: 'Water', quantity_for_500_units: 65 },
-      { name: 'Fragrance (Lemon Blast)', quantity_for_500_units: 10 },
-      { name: 'Blue Colour', quantity_for_500_units: 0.5 }
+      { name: 'Water', quantity_for_500_units: 65 }
     ]
   },
   {
@@ -39,9 +37,7 @@ export const PRODUCTS: ProductConfig[] = [
       { name: 'CAPB', quantity_for_500_units: 50 },
       { name: 'Salt', quantity_for_500_units: 150 },
       { name: 'Sodium Benzoate', quantity_for_500_units: 2.5 },
-      { name: 'Water', quantity_for_500_units: 67.5 },
-      { name: 'Fragrance (White Flower)', quantity_for_500_units: 7.5 },
-      { name: 'Yellow Colour', quantity_for_500_units: 0.5 }
+      { name: 'Water', quantity_for_500_units: 67.5 }
     ]
   },
   {
