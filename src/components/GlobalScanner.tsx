@@ -12,6 +12,7 @@ const GlobalScanner = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const scannerBuffer = useRef('');
@@ -145,9 +146,10 @@ const GlobalScanner = () => {
     setShowConfirm(false);
   };
 
-  const handleConfirmStockIn = async () => {
+  const handleConfirmScan = async () => {
     if (!scannedBatch) return;
     try {
+      setIsSaving(true);
       const { error } = await supabase.from('batches').update({
         inventory_room_saved: true,
         barcode_status: 'Stock In',
@@ -157,10 +159,13 @@ const GlobalScanner = () => {
 
       if (error) throw error;
       
-      // Send webhook after successful DB update
-      await sendScanWebhook(scannedBatch);
+      try {
+        await sendScanWebhook(scannedBatch);
+      } catch (webhookError) {
+        console.error("Webhook failed but inventory saved:", webhookError);
+      }
       
-      setToastMessage('Barcode scanned successfully');
+      setToastMessage('Stock added to Inventory Room successfully');
       setShowConfirm(false);
       setScannedBatch({...scannedBatch, inventory_room_saved: true, barcode_status: 'Stock In', status: 'Stock In'});
 
@@ -172,8 +177,10 @@ const GlobalScanner = () => {
       }, 1500);
       
     } catch (err) {
-      console.error('Error confirming stock in:', err);
-      setError('Failed to save to Inventory Room.');
+      console.error('Confirm scan failed:', err);
+      alert("Failed to confirm scan. Check console for details.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -283,8 +290,13 @@ const GlobalScanner = () => {
                   {showConfirm ? (
                     <>
                       <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
-                      <button type="button" className="btn btn-primary" onClick={handleConfirmStockIn}>
-                        Confirm Scan
+                      <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={handleConfirmScan}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? "Saving..." : "Confirm Scan"}
                       </button>
                     </>
                   ) : (
