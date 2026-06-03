@@ -215,8 +215,8 @@ const ProductionBatchDetail = () => {
 
   if (!productionBatch) return <div style={{ padding: '48px', textAlign: 'center' }}>Loading...</div>;
 
-  const checkedIngredientsCount = ingredients.filter(i => i.status === 'Ready').length;
-  const allIngredientsPrepared = ingredients.length === 0 || checkedIngredientsCount === ingredients.length;
+  const checkedIngredientsCount = ingredients?.filter((i: any) => i.status === 'Ready').length || 0;
+  const allIngredientsPrepared = !ingredients || ingredients.length === 0 || checkedIngredientsCount === ingredients.length;
 
   let progress = 0;
   if (productionBatch.status === 'Prep') {
@@ -384,17 +384,22 @@ const ProductionBatchDetail = () => {
           {!showMicroBatches && allIngredientsPrepared && (
             <div style={{ padding: '16px', background: 'var(--success-bg)', color: 'var(--success-text)', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
               <CheckCircle2 size={24} />
-              <div style={{ fontWeight: 600 }}>All ingredients prepared successfully.</div>
+              <div style={{ fontWeight: 600 }}>
+                {(!ingredients || ingredients.length === 0) ? "No ingredients required. Ready to start." : "All ingredients prepared successfully."}
+              </div>
             </div>
           )}
 
           {!showMicroBatches && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button 
+                type="button"
                 className="btn btn-primary" 
-                style={allIngredientsPrepared ? { background: '#f97316', borderColor: '#f97316' } : {}}
-                disabled={!allIngredientsPrepared}
-                onClick={handleStartMicroBatches}
+                style={{ background: '#f97316', borderColor: '#f97316' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleStartMicroBatches();
+                }}
               >
                 <Play size={18} /> Start Micro Batches
               </button>
