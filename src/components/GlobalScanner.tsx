@@ -154,18 +154,29 @@ const GlobalScanner = () => {
       console.log("Selected batch before confirm:", scannedBatch);
       console.log("Updating batch id:", scannedBatch.id);
       
-      const { error } = await supabase.from('batches').update({
+      let updatePayload = {
         inventory_room_saved: true,
         barcode_status: 'Stock In',
-        status: 'Stock In',
         stock_in_at: new Date().toISOString()
-      }).eq('id', scannedBatch.id);
+      };
+
+      let { error } = await supabase.from('batches').update(updatePayload).eq('id', scannedBatch.id);
+
+      if (error && error.message?.includes('stock_in_at')) {
+        const retry = await supabase.from('batches').update({
+          inventory_room_saved: true,
+          barcode_status: 'Stock In'
+        }).eq('id', scannedBatch.id);
+        
+        error = retry.error;
+      }
 
       console.log("Supabase update result:", error);
 
       if (error) {
-        console.error("Supabase stock in update failed:", error);
-        throw error;
+        console.error("Supabase update failed full error:", JSON.stringify(error, null, 2));
+        alert(error.message || "Failed to update batch");
+        return;
       }
       
       try {
