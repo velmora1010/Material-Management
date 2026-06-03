@@ -22,7 +22,10 @@ export const PRODUCTS: ProductConfig[] = [
       { name: 'AOS', quantity_for_500_units: 50 },
       { name: 'CAPB', quantity_for_500_units: 50 },
       { name: 'Salt', quantity_for_500_units: 150 },
-      { name: 'Fragrance - Lemon Blast', quantity_for_500_units: 10 }
+      { name: 'Sodium Benzoate', quantity_for_500_units: 2.5 },
+      { name: 'Water', quantity_for_500_units: 67.5 },
+      { name: 'Fragrance', quantity_for_500_units: 7.5 },
+      { name: 'Colour', quantity_for_500_units: 0.5 }
     ]
   },
   {

@@ -10,6 +10,8 @@ const NewProductionBatch = () => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [sizeType, setSizeType] = useState<'Full' | 'Micro' | 'Custom' | null>(null);
   const [customUnits, setCustomUnits] = useState<number>(500);
+  const [producedBy, setProducedBy] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
 
   const { data: allRawMaterialBatches = [] } = useSupabaseQuery<any>('batches');
 
@@ -57,7 +59,7 @@ const NewProductionBatch = () => {
   }, [requiredIngredients, allRawMaterialBatches]);
 
   const hasInsufficientStock = ingredientStatus.some(s => !s.sufficient);
-  const canStart = selectedProduct && sizeType && !hasInsufficientStock && (requiredIngredients !== null);
+  const canStart = selectedProduct && sizeType && !hasInsufficientStock && (requiredIngredients !== null) && producedBy.trim() !== '';
 
   const handleStartBatch = async () => {
     if (!canStart) return;
@@ -71,8 +73,8 @@ const NewProductionBatch = () => {
       product_name: selectedProduct.name,
       total_units: totalUnits,
       batch_type: sizeType === 'Full' ? 'Full Set' : sizeType === 'Micro' ? 'Micro Batch' : 'Custom',
-      produced_by: 'System User', // Hardcoded for now
-      notes: '',
+      produced_by: producedBy.trim(),
+      notes: notes.trim(),
       status: 'Prep',
       total_micro_batches: microBatches.length,
       completed_micro_batches: 0,
@@ -268,6 +270,29 @@ const NewProductionBatch = () => {
                     <div style={{ fontWeight: 600 }}>All required raw materials are available. You can start this batch.</div>
                   </div>
                 )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Produced By <span style={{ color: '#dc2626' }}>*</span></label>
+                    <input 
+                      type="text" 
+                      placeholder="Enter name"
+                      value={producedBy} 
+                      onChange={e => setProducedBy(e.target.value)} 
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Notes (Optional)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Add any notes"
+                      value={notes} 
+                      onChange={e => setNotes(e.target.value)} 
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
                   <button className="btn btn-secondary" onClick={() => navigate('/production')}>Cancel</button>

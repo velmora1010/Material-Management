@@ -216,7 +216,7 @@ const ProductionBatchDetail = () => {
   if (!productionBatch) return <div style={{ padding: '48px', textAlign: 'center' }}>Loading...</div>;
 
   const checkedIngredientsCount = ingredients?.filter((i: any) => i.status === 'Ready').length || 0;
-  const allIngredientsPrepared = !ingredients || ingredients.length === 0 || checkedIngredientsCount === ingredients.length;
+  const allIngredientsPrepared = ingredients && ingredients.length > 0 && checkedIngredientsCount === ingredients.length;
 
   let progress = 0;
   if (productionBatch.status === 'Prep') {
@@ -381,12 +381,16 @@ const ProductionBatchDetail = () => {
             ))}
           </div>
 
-          {!showMicroBatches && allIngredientsPrepared && (
+          {!showMicroBatches && (!ingredients || ingredients.length === 0) && (
+            <div style={{ padding: '16px', background: 'var(--surface-soft)', color: 'var(--text-secondary)', borderRadius: '8px', marginBottom: '24px', textAlign: 'center' }}>
+              <div style={{ fontWeight: 600 }}>No ingredients found for this production batch. Please add ingredients.</div>
+            </div>
+          )}
+
+          {!showMicroBatches && allIngredientsPrepared && ingredients.length > 0 && (
             <div style={{ padding: '16px', background: 'var(--success-bg)', color: 'var(--success-text)', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
               <CheckCircle2 size={24} />
-              <div style={{ fontWeight: 600 }}>
-                {(!ingredients || ingredients.length === 0) ? "No ingredients required. Ready to start." : "All ingredients prepared successfully."}
-              </div>
+              <div style={{ fontWeight: 600 }}>All ingredients prepared successfully.</div>
             </div>
           )}
 
@@ -395,7 +399,8 @@ const ProductionBatchDetail = () => {
               <button 
                 type="button"
                 className="btn btn-primary" 
-                style={{ background: '#f97316', borderColor: '#f97316' }}
+                style={allIngredientsPrepared ? { background: '#f97316', borderColor: '#f97316' } : {}}
+                disabled={!allIngredientsPrepared}
                 onClick={(e) => {
                   e.preventDefault();
                   handleStartMicroBatches();
