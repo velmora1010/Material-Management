@@ -150,6 +150,10 @@ const GlobalScanner = () => {
     if (!scannedBatch) return;
     try {
       setIsSaving(true);
+      
+      console.log("Selected batch before confirm:", scannedBatch);
+      console.log("Updating batch id:", scannedBatch.id);
+      
       const { error } = await supabase.from('batches').update({
         inventory_room_saved: true,
         barcode_status: 'Stock In',
@@ -157,12 +161,26 @@ const GlobalScanner = () => {
         stock_in_at: new Date().toISOString()
       }).eq('id', scannedBatch.id);
 
-      if (error) throw error;
+      console.log("Supabase update result:", error);
+
+      if (error) {
+        console.error("Supabase stock in update failed:", error);
+        throw error;
+      }
       
       try {
-        await sendScanWebhook(scannedBatch);
+        await sendScanWebhook({
+          barcode_no: scannedBatch.serial_number || scannedBatch.batch_id,
+          material_name: scannedBatch.material_name,
+          batch_no: Number(scannedBatch.batch_number || scannedBatch.batch_no || 0),
+          vendor_name: scannedBatch.vendor_name,
+          quantity_kg: Number(scannedBatch.quantity || scannedBatch.original_quantity || scannedBatch.available_quantity || 0),
+          status: "Stock In",
+          scanned_at: new Date().toISOString(),
+          payload: scannedBatch
+        });
       } catch (webhookError) {
-        console.error("Webhook failed but inventory saved:", webhookError);
+        console.error("Webhook failed but inventory was saved:", webhookError);
       }
       
       setToastMessage('Stock added to Inventory Room successfully');
