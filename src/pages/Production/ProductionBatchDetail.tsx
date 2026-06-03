@@ -18,6 +18,7 @@ const ProductionBatchDetail = () => {
   const [failReason, setFailReason] = useState('Quality issue');
 
   const [barcodeModalOpen, setBarcodeModalOpen] = useState<any>(null);
+  const [forceShowMicroBatches, setForceShowMicroBatches] = useState(false);
 
   const { data: productionBatches = [], refetch: refetchBatch } = useSupabaseQuery<any>('production_batches', q => q.eq('id', id));
   const productionBatch = productionBatches[0];
@@ -89,11 +90,20 @@ const ProductionBatchDetail = () => {
   };
 
   const handleStartMicroBatches = async () => {
+    console.log("START MICRO BATCHES CLICKED");
+    alert("Start Micro Batches clicked");
+
     if (!productionBatch) return;
 
-    console.log("Start Micro Batches clicked");
-    console.log("Production batch:", productionBatch);
+    if (ingredients.length === 0) {
+      alert("No ingredients found, but micro batch stage started.");
+    }
+
+    console.log("Creating micro batches for production batch:", productionBatch);
     console.log("Micro batches:", microBatches);
+
+    // Minimum working behavior: UI updates immediately
+    setForceShowMicroBatches(true);
 
     try {
       if (microBatches.length === 0 && productionBatch.total_micro_batches > 0) {
@@ -106,15 +116,18 @@ const ProductionBatchDetail = () => {
           status: 'Waiting'
         }));
 
-        const { error: insertError } = await supabase.from('production_micro_batches').insert(newMicroBatches);
+        const { data, error: insertError } = await supabase.from('production_micro_batches').insert(newMicroBatches).select();
+        console.log("Supabase insert micro batches result:", data, insertError);
         if (insertError) throw insertError;
       }
 
-      const { error: updateError } = await supabase
+      const { data, error: updateError } = await supabase
         .from('production_batches')
         .update({ status: 'In Progress' })
-        .eq('id', productionBatch.id);
+        .eq('id', productionBatch.id)
+        .select();
 
+      console.log("Supabase update production_batches result:", data, updateError);
       if (updateError) throw updateError;
 
       refetchBatch();
@@ -203,7 +216,7 @@ const ProductionBatchDetail = () => {
   if (!productionBatch) return <div style={{ padding: '48px', textAlign: 'center' }}>Loading...</div>;
 
   const checkedIngredientsCount = ingredients.filter(i => i.status === 'Ready').length;
-  const allIngredientsPrepared = ingredients.length > 0 && checkedIngredientsCount === ingredients.length;
+  const allIngredientsPrepared = ingredients.length === 0 || checkedIngredientsCount === ingredients.length;
 
   let progress = 0;
   if (productionBatch.status === 'Prep') {
@@ -213,7 +226,7 @@ const ProductionBatchDetail = () => {
   }
 
   const isFullyComplete = productionBatch.status === 'Complete';
-  const showMicroBatches = productionBatch.status === 'In Progress' || productionBatch.status === 'Complete';
+  const showMicroBatches = forceShowMicroBatches || productionBatch.status === 'In Progress' || productionBatch.status === 'Complete';
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '64px' }}>
