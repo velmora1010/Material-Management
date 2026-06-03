@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CheckSquare, Square, QrCode, Play, Printer, CheckCircle2, Home, PackagePlus, Boxes } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useSupabaseQuery } from '../../hooks/useSupabase';
 import { supabase } from '../../lib/supabaseClient';
+import { calculateRequiredIngredients } from '../../config/productFormulas';
 
 const ProductionBatchDetail = () => {
   const { id } = useParams();
@@ -25,8 +26,47 @@ const ProductionBatchDetail = () => {
 
   const prodBatchId = productionBatch?.production_batch_id || '';
   
-  const { data: ingredients = [], refetch: refetchIng } = useSupabaseQuery<any>('production_ingredients', q => q.eq('production_batch_id', prodBatchId));
-  const { data: microBatches = [], refetch: refetchMb } = useSupabaseQuery<any>('production_micro_batches', q => q.eq('production_batch_id', prodBatchId));
+  const { data: ingredientsData, loading: ingredientsLoading, refetch: refetchIng } = useSupabaseQuery<any>('production_ingredients', q => q.eq('production_batch_id', prodBatchId), [prodBatchId]);
+  const ingredients = ingredientsData || [];
+  
+  const { data: microBatchesData, refetch: refetchMb } = useSupabaseQuery<any>('production_micro_batches', q => q.eq('production_batch_id', prodBatchId), [prodBatchId]);
+  const microBatches = microBatchesData || [];
+
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  // Auto-restore ingredients if missing
+  useEffect(() => {
+    const restoreIngredients = async () => {
+      if (!ingredientsLoading && ingredients.length === 0 && productionBatch && !isRestoring) {
+        setIsRestoring(true);
+        try {
+          const { PRODUCTS } = await import('../../config/productFormulas');
+          const product = PRODUCTS.find(p => p.name === productionBatch.product_name);
+          
+          if (product) {
+            const reqIngs = calculateRequiredIngredients(product.id, productionBatch.total_units);
+            if (reqIngs) {
+              const records = reqIngs.map(ing => ({
+                production_batch_id: prodBatchId,
+                material_name: ing.name,
+                required_quantity: ing.required_quantity,
+                available_quantity_at_start: 0,
+                scanned_quantity: 0,
+                status: 'Pending'
+              }));
+              await supabase.from('production_ingredients').insert(records);
+              refetchIng();
+            }
+          }
+        } catch (err) {
+          console.error("Auto-restore failed:", err);
+        } finally {
+          setIsRestoring(false);
+        }
+      }
+    };
+    restoreIngredients();
+  }, [ingredientsLoading, ingredients.length, productionBatch, isRestoring, prodBatchId, refetchIng]);
 
   const handleToggleIngredient = async (ing: any) => {
     const newStatus = ing.status === 'Ready' ? 'Pending' : 'Ready';
@@ -257,8 +297,21 @@ const ProductionBatchDetail = () => {
       <div className="page-card" style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px' }}>
           <div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>Production Progress</h3>
-            <div style={{ display: 'flex', gap: '24px', fontSize: '14px' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>Total Ingredients Needed</h3>
+            
+            {!ingredientsLoading && ingredients.length === 0 && (
+              <div style={{ padding: '24px', textAlign: 'center', background: '#fef2f2', color: '#dc2626', borderRadius: '12px', border: '1px solid #fecaca', marginBottom: '24px' }}>
+                <div style={{ fontWeight: 600 }}>Ingredients not found. Please recreate this batch.</div>
+              </div>
+            )}
+            
+            {isRestoring && (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                Loading ingredients...
+              </div>
+            )}
+
+            <div className="grid grid-2" style={{ gap: '16px', marginBottom: '24px' }}>
               <div><span style={{ color: 'var(--text-muted)' }}>Produced Units:</span> <strong style={{ color: 'var(--text-primary)' }}>{productionBatch.produced_units}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Inventory Units:</span> <strong style={{ color: 'var(--text-primary)' }}>{productionBatch.inventory_units}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Micro Batches:</span> <strong style={{ color: 'var(--text-primary)' }}>{productionBatch.completed_micro_batches} / {productionBatch.total_micro_batches}</strong></div>
@@ -380,12 +433,6 @@ const ProductionBatchDetail = () => {
               </div>
             ))}
           </div>
-
-          {!showMicroBatches && (!ingredients || ingredients.length === 0) && (
-            <div style={{ padding: '16px', background: 'var(--surface-soft)', color: 'var(--text-secondary)', borderRadius: '8px', marginBottom: '24px', textAlign: 'center' }}>
-              <div style={{ fontWeight: 600 }}>No ingredients found for this production batch. Please add ingredients.</div>
-            </div>
-          )}
 
           {!showMicroBatches && allIngredientsPrepared && ingredients.length > 0 && (
             <div style={{ padding: '16px', background: 'var(--success-bg)', color: 'var(--success-text)', borderRadius: '8px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
