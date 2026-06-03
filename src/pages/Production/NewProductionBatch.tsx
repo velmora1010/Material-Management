@@ -59,57 +59,70 @@ const NewProductionBatch = () => {
   }, [requiredIngredients, allRawMaterialBatches]);
 
   const hasInsufficientStock = ingredientStatus.some(s => !s.sufficient);
-  const canStart = selectedProduct && sizeType && !hasInsufficientStock && (requiredIngredients !== null) && producedBy.trim() !== '';
+  const canStart = selectedProduct && sizeType && !hasInsufficientStock && (requiredIngredients !== null);
 
   const handleStartBatch = async () => {
-    if (!canStart) return;
-
-    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
-    const prodBatchId = `PROD-${dateStr}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
-
-    // 1. Create Production Batch
-    const { data: batchData, error: batchError } = await supabase.from('production_batches').insert({
-      production_batch_id: prodBatchId,
-      product_name: selectedProduct.name,
-      total_units: totalUnits,
-      batch_type: sizeType === 'Full' ? 'Full Set' : sizeType === 'Micro' ? 'Micro Batch' : 'Custom',
-      produced_by: producedBy.trim(),
-      notes: notes.trim(),
-      status: 'Prep',
-      total_micro_batches: microBatches.length,
-      completed_micro_batches: 0,
-      produced_units: 0,
-      inventory_units: 0
-    }).select('id').single();
-
-    if (batchError) {
-      alert("Failed to create production batch");
+    console.log("Start Batch clicked");
+    
+    if (!producedBy.trim()) {
+      alert("Please enter Produced By");
       return;
     }
-    const dbBatchId = batchData.id;
 
-    // 2. Create Micro Batches
-    const microBatchRecords = microBatches.map(mb => ({
-      production_batch_id: prodBatchId,
-      micro_batch_no: mb.no,
-      units: mb.qty,
-      status: 'Waiting'
-    }));
-    await supabase.from('production_micro_batches').insert(microBatchRecords);
+    if (!canStart) return;
 
-    // 3. Create Required Ingredients
-    const ingredientRecords = requiredIngredients.map(ing => ({
-      production_batch_id: prodBatchId,
-      material_name: ing.name,
-      required_quantity: ing.required_quantity,
-      available_quantity_at_start: ingredientStatus.find(s => s.name === ing.name)?.available || 0,
-      scanned_quantity: 0,
-      status: 'Pending'
-    }));
-    await supabase.from('production_ingredients').insert(ingredientRecords);
+    try {
+      const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+      const prodBatchId = `PROD-${dateStr}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
 
-    // Navigate to detail page
-    navigate(`/production/batch/${dbBatchId}`);
+      // 1. Create Production Batch
+      const { data: batchData, error: batchError } = await supabase.from('production_batches').insert({
+        production_batch_id: prodBatchId,
+        product_name: selectedProduct.name,
+        total_units: totalUnits,
+        batch_type: sizeType === 'Full' ? 'Full Set' : sizeType === 'Micro' ? 'Micro Batch' : 'Custom',
+        produced_by: producedBy.trim(),
+        notes: notes.trim(),
+        status: 'Prep',
+        total_micro_batches: microBatches.length,
+        completed_micro_batches: 0,
+        produced_units: 0,
+        inventory_units: 0
+      }).select('id').single();
+
+      if (batchError) {
+        throw batchError;
+      }
+      const dbBatchId = batchData.id;
+
+      // 2. Create Micro Batches
+      const microBatchRecords = microBatches.map(mb => ({
+        production_batch_id: prodBatchId,
+        micro_batch_no: mb.no,
+        units: mb.qty,
+        status: 'Waiting'
+      }));
+      const { error: mbError } = await supabase.from('production_micro_batches').insert(microBatchRecords);
+      if (mbError) throw mbError;
+
+      // 3. Create Required Ingredients
+      const ingredientRecords = requiredIngredients.map(ing => ({
+        production_batch_id: prodBatchId,
+        material_name: ing.name,
+        required_quantity: ing.required_quantity,
+        available_quantity_at_start: ingredientStatus.find(s => s.name === ing.name)?.available || 0,
+        scanned_quantity: 0,
+        status: 'Pending'
+      }));
+      const { error: ingError } = await supabase.from('production_ingredients').insert(ingredientRecords);
+      if (ingError) throw ingError;
+
+      // Navigate to detail page
+      navigate(`/production/batch/${dbBatchId}`);
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Failed to create production batch");
+    }
   };
 
   return (
@@ -297,6 +310,7 @@ const NewProductionBatch = () => {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
                   <button className="btn btn-secondary" onClick={() => navigate('/production')}>Cancel</button>
                   <button 
+                    type="button"
                     className="btn btn-primary" 
                     style={canStart ? { background: '#f97316', borderColor: '#f97316' } : {}}
                     disabled={!canStart} 
