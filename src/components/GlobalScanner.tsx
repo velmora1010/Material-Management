@@ -91,7 +91,7 @@ const GlobalScanner = () => {
       setScanInput(code); // Update the input field with the found code
       setIsProcessing(false);
       
-      const isAlreadyScanned = foundBatch.inventory_room_saved || foundBatch.barcode_status === 'Stock In' || foundBatch.status === 'Stock In';
+      const isAlreadyScanned = foundBatch.inventory_room_saved || foundBatch.barcode_status === 'Stock In';
       setShowConfirm(!isAlreadyScanned);
     } catch (err) {
       console.error(err);
@@ -196,7 +196,7 @@ const GlobalScanner = () => {
       
       setToastMessage('Stock added to Inventory Room successfully');
       setShowConfirm(false);
-      setScannedBatch({...scannedBatch, inventory_room_saved: true, barcode_status: 'Stock In', status: 'Stock In'});
+      setScannedBatch({...scannedBatch, inventory_room_saved: true, barcode_status: 'Stock In'});
 
       setTimeout(() => {
         setToastMessage('');

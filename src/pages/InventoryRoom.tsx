@@ -21,8 +21,7 @@ const InventoryRoom = () => {
   // Filter raw batches that have been scanned into inventory
   const scannedRawBatches = rawBatches.filter(b => 
     b.inventory_room_saved === true || 
-    b.barcode_status === 'Stock In' ||
-    b.status === 'Stock In'
+    b.barcode_status === 'Stock In'
   ).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Summary Calcs
