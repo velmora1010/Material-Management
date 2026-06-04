@@ -193,14 +193,12 @@ const GlobalScanner = () => {
       
       try {
         await sendScanWebhook({
-          barcode_no: scannedBatch.serial_number || scannedBatch.batch_id,
+          barcode_no: scannedBatch.serial_number,
           material_name: scannedBatch.material_name,
-          batch_no: Number(scannedBatch.batch_number || scannedBatch.batch_no || 0),
-          vendor_name: scannedBatch.vendor_name,
-          quantity_kg: Number(scannedBatch.quantity || scannedBatch.original_quantity || scannedBatch.available_quantity || 0),
-          status: "Stock In",
+          batch_no: scannedBatch.batch_number || scannedBatch.batch_no || 0,
+          quantity: scannedBatch.original_quantity || scannedBatch.quantity || scannedBatch.available_quantity || 0,
+          vendor: scannedBatch.vendor_name || scannedBatch.vendor,
           scanned_at: new Date().toISOString(),
-          payload: scannedBatch
         });
       } catch (webhookError) {
         console.error("Webhook failed but inventory was saved:", webhookError);
