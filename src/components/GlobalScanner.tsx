@@ -107,10 +107,22 @@ const GlobalScanner = () => {
         return;
       }
 
+      // Check if an input is focused, to prevent scanner from capturing regular typing
+      const activeElement = document.activeElement;
+      if (activeElement) {
+        const tagName = activeElement.tagName.toLowerCase();
+        if (['input', 'textarea', 'select'].includes(tagName)) {
+          // If the active element is the Global Scanner input itself, let normal typing or scanning happen
+          if (activeElement.id !== 'global-scanner-input') {
+            return; // User is typing somewhere else, ignore
+          }
+        }
+      }
+
       const currentTime = Date.now();
 
-      // If time between keys is more than 100ms, reset buffer (normal typing is slower)
-      if (currentTime - lastKeyTime.current > 100) {
+      // If time between keys is more than 150ms, reset buffer (normal typing is slower, scanner is < 50ms)
+      if (currentTime - lastKeyTime.current > 150) {
         scannerBuffer.current = '';
       }
 
@@ -246,8 +258,9 @@ const GlobalScanner = () => {
             {!scannedBatch ? (
               <>
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>Scanner Input Box</label>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>Scan/Paste Barcode</label>
                   <input 
+                    id="global-scanner-input"
                     ref={inputRef as any}
                     autoFocus
                     required
@@ -282,7 +295,7 @@ const GlobalScanner = () => {
 
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
-                  <button type="button" className="btn btn-primary" onClick={() => processBarcode(scanInput)}>Test Search Button</button>
+                  <button type="button" className="btn btn-primary" onClick={() => processBarcode(scanInput)}>Test Scan</button>
                 </div>
               </>
             ) : (
